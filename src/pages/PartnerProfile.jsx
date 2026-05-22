@@ -116,17 +116,13 @@ export default function PartnerProfile({ partnerId, navigate }) {
               value={partner.stage || "Identified"}
               onChange={async (e) => {
                 const newStage = e.target.value;
-                console.log("Updating stage — partner.id:", partner.id, "newStage:", newStage);
                 setPartner(prev => ({ ...prev, stage: newStage }));
                 const { error } = await supabase
                   .from("partners")
                   .update({ stage: newStage })
                   .eq("id", partner.id);
                 if (error) {
-                  console.error("Stage update error:", error);
                   alert("Stage save failed: " + error.message);
-                } else {
-                  console.log("Stage updated successfully.");
                 }
               }}
               style={{

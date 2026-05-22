@@ -8,10 +8,14 @@
       stage: newStage,
     }));
 
-    await supabase
+    const { error } = await supabase
       .from("partners")
       .update({ stage: newStage })
       .eq("id", partner.id);
+
+    if (error) {
+      alert("Stage save failed: " + error.message);
+    }
   }}
   style={{
     padding: "7px 12px",

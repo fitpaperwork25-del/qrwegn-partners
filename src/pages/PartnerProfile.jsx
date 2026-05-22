@@ -2,16 +2,10 @@ import { useState, useEffect } from "react";
 import { supabase } from "../lib/supabase";
 import { STAGE_COLORS, STAGES, StageBadge, Card } from "./AdminDashboard";
 
-const TRAINING = [
-  { id: 1, title: "QR-Wegn Platform Overview", type: "PDF", status: "completed", assignedAt: "May 14" },
-  { id: 2, title: "How to Onboard a Restaurant", type: "Video", status: "in_progress", assignedAt: "May 17" },
-  { id: 3, title: "Partner Commission Structure", type: "PDF", status: "assigned", assignedAt: "May 19" },
-  { id: 4, title: "QR Label Printing Guide", type: "PDF", status: "assigned", assignedAt: "May 19" },
-];
-
 const STATUS_COLORS = {
   completed:   { bg: "rgba(40,180,80,0.1)",   color: "#35c060", label: "Completed" },
   in_progress: { bg: "rgba(240,180,60,0.12)", color: "#f0c040", label: "In Progress" },
+  pending:     { bg: "rgba(100,160,220,0.3)", color: "#5ab0f0", label: "Pending" },
   assigned:    { bg: "rgba(100,160,220,0.3)", color: "#5ab0f0", label: "Assigned" },
 };
 
@@ -24,6 +18,8 @@ export default function PartnerProfile({ partnerId, navigate }) {
   const [commLog, setCommLog] = useState([]);
   const [commLoading, setCommLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [training, setTraining] = useState([]);
+  const [trainingLoading, setTrainingLoading] = useState(false);
 
   useEffect(() => {
     if (!partnerId) { setLoading(false); return; }
@@ -52,6 +48,21 @@ export default function PartnerProfile({ partnerId, navigate }) {
   };
 
   useEffect(() => { loadComms(); }, [partnerId]);
+
+  useEffect(() => {
+    if (!partnerId) return;
+    const loadTraining = async () => {
+      setTrainingLoading(true);
+      const { data, error } = await supabase
+        .from("training_assignments")
+        .select("*")
+        .eq("partner_id", partnerId)
+        .order("created_at", { ascending: true });
+      if (!error) setTraining(data || []);
+      setTrainingLoading(false);
+    };
+    loadTraining();
+  }, [partnerId]);
 
   const handleSaveInteraction = async () => {
     if (!note.trim()) return;
@@ -142,7 +153,7 @@ export default function PartnerProfile({ partnerId, navigate }) {
             { label: "Source",      value: partner.source || "—" },
             { label: "Commission",  value: partner.commission_rate != null ? `${partner.commission_rate}%` : "—" },
             { label: "Market Tier", value: partner.market_tier || "—" },
-            { label: "Training",    value: `${TRAINING.filter(t => t.status === "completed").length}/${TRAINING.length} done` },
+            { label: "Training",    value: training.length ? `${training.filter(t => t.status === "completed").length}/${training.length} done` : "—" },
           ].map(s => (
             <div key={s.label}>
               <div style={{ fontSize: 12, color: "#7ab0cc", letterSpacing: "0.06em", marginBottom: 2 }}>{s.label.toUpperCase()}</div>
@@ -240,25 +251,29 @@ export default function PartnerProfile({ partnerId, navigate }) {
       {activeTab === "training" && (
         <Card>
           <div style={{ fontSize: 14, fontWeight: 600, color: "#a0c8e8", letterSpacing: "0.08em", marginBottom: 16 }}>TRAINING PROGRESS</div>
-          {TRAINING.map(t => {
-            const sc = STATUS_COLORS[t.status];
+          {trainingLoading && <p style={{ color: "#7ab0cc", fontSize: 14 }}>Loading...</p>}
+          {!trainingLoading && training.length === 0 && (
+            <p style={{ fontSize: 14, color: "#7ab0cc", textAlign: "center", padding: "20px 0" }}>No training assigned yet.</p>
+          )}
+          {training.map(t => {
+            const sc = STATUS_COLORS[t.status] || STATUS_COLORS.pending;
             return (
               <div key={t.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 0", borderBottom: "1px solid rgba(100,160,220,0.22)" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                   <div style={{ width: 36, height: 36, borderRadius: 8, background: "rgba(100,160,220,0.22)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>
-                    {t.type === "Video" ? "▷" : "◻"}
+                    ◻
                   </div>
                   <div>
                     <div style={{ fontSize: 16, fontWeight: 600, color: "#ffffff" }}>{t.title}</div>
-                    <div style={{ fontSize: 13, color: "#7ab0cc" }}>{t.type} · Assigned {t.assignedAt}</div>
+                    {t.description && <div style={{ fontSize: 13, color: "#7ab0cc", marginTop: 2 }}>{t.description}</div>}
                   </div>
                 </div>
-                <span style={{ fontSize: 13, fontWeight: 600, background: sc.bg, color: sc.color, padding: "3px 10px", borderRadius: 20 }}>{sc.label}</span>
+                <span style={{ fontSize: 13, fontWeight: 600, background: sc.bg, color: sc.color, padding: "3px 10px", borderRadius: 20, whiteSpace: "nowrap" }}>{sc.label}</span>
               </div>
             );
           })}
           <button style={{ marginTop: 14, fontSize: 15, color: "#5ab0f0", background: "rgba(80,160,230,0.15)", border: "1px solid rgba(80,160,230,0.35)", borderRadius: 8, padding: "8px 16px", cursor: "pointer", fontWeight: 500 }}>
-            + Assign Material
+            + Assign Training
           </button>
         </Card>
       )}

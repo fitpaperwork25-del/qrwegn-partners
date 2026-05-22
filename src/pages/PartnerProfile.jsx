@@ -1,5 +1,5 @@
 ﻿import { useState } from "react";
-import { MOCK_PARTNERS, STAGE_COLORS, STAGES, StageBadge, Card } from "./AdminDashboard";
+import { STAGE_COLORS, STAGES, StageBadge, Card } from "./AdminDashboard";
 
 const COMM_LOG = [
   { id: 1, type: "Call", date: "May 19, 2026", notes: "Introduced QR-Wegn concept. Teclai showed strong interest in the restaurant vertical. Mentioned 3 contacts in Juba.", by: "Admin" },

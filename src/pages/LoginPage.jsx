@@ -10,6 +10,10 @@ export default function LoginPage({ onLogin }) {
   const [resetSent, setResetSent] = useState(false);
 
   const handleLogin = async () => {
+    if (!email.trim() || !password.trim()) {
+      setError("Please enter your email and password.");
+      return;
+    }
     setLoading(true);
     setError("");
 

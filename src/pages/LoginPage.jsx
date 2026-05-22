@@ -50,7 +50,9 @@ export default function LoginPage({ onLogin }) {
 
   const handleForgotPassword = async () => {
     if (!email) { setError("Enter your email first."); return; }
-    const { error: resetError } = await supabase.auth.resetPasswordForEmail(email);
+    const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: "https://qrwegn-partners.vercel.app",
+    });
     if (resetError) { setError(resetError.message); return; }
     setResetSent(true);
     setError("");

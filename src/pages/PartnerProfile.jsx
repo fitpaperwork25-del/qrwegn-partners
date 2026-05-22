@@ -20,6 +20,7 @@ export default function PartnerProfile({ partnerId, navigate }) {
   const [saving, setSaving] = useState(false);
   const [training, setTraining] = useState([]);
   const [trainingLoading, setTrainingLoading] = useState(false);
+  const [trainingError, setTrainingError] = useState(null);
 
   useEffect(() => {
     if (!partnerId) { setLoading(false); return; }
@@ -53,12 +54,14 @@ export default function PartnerProfile({ partnerId, navigate }) {
     if (!partnerId) return;
     const loadTraining = async () => {
       setTrainingLoading(true);
+      console.log("Loading training for partnerId:", partnerId);
       const { data, error } = await supabase
         .from("training_assignments")
         .select("*")
-        .eq("partner_id", partnerId)
-        .order("created_at", { ascending: true });
-      if (!error) setTraining(data || []);
+        .eq("partner_id", partnerId);
+      console.log("training_assignments data:", data, "error:", error);
+      if (error) setTrainingError(error.message);
+      setTraining(data || []);
       setTrainingLoading(false);
     };
     loadTraining();
@@ -252,7 +255,10 @@ export default function PartnerProfile({ partnerId, navigate }) {
         <Card>
           <div style={{ fontSize: 14, fontWeight: 600, color: "#a0c8e8", letterSpacing: "0.08em", marginBottom: 16 }}>TRAINING PROGRESS</div>
           {trainingLoading && <p style={{ color: "#7ab0cc", fontSize: 14 }}>Loading...</p>}
-          {!trainingLoading && training.length === 0 && (
+          {!trainingLoading && trainingError && (
+            <p style={{ fontSize: 14, color: "#f07070", padding: "10px 0" }}>Error: {trainingError}</p>
+          )}
+          {!trainingLoading && !trainingError && training.length === 0 && (
             <p style={{ fontSize: 14, color: "#7ab0cc", textAlign: "center", padding: "20px 0" }}>No training assigned yet.</p>
           )}
           {training.map(t => {

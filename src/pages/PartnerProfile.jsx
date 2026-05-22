@@ -2,11 +2,6 @@ import { useState, useEffect } from "react";
 import { supabase } from "../lib/supabase";
 import { STAGE_COLORS, STAGES, StageBadge, Card } from "./AdminDashboard";
 
-const COMM_LOG = [
-  { id: 1, type: "Call", date: "May 19, 2026", notes: "Introduced QR-Wegn concept. Strong interest in the restaurant vertical.", by: "Admin" },
-  { id: 2, type: "Email", date: "May 17, 2026", notes: "Sent partner overview PDF and demo link.", by: "Admin" },
-  { id: 3, type: "Meeting", date: "May 14, 2026", notes: "First in-person meeting. Walked through live demo on tablet. Very positive reaction.", by: "Admin" },
-];
 
 const TRAINING = [
   { id: 1, title: "QR-Wegn Platform Overview", type: "PDF", status: "completed", assignedAt: "May 14" },
@@ -27,10 +22,13 @@ export default function PartnerProfile({ partnerId, navigate }) {
   const [activeTab, setTab] = useState("overview");
   const [note, setNote] = useState("");
   const [commType, setCommType] = useState("Call");
+  const [commLog, setCommLog] = useState([]);
+  const [commLoading, setCommLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (!partnerId) { setLoading(false); return; }
-    const load = async () => {
+    const loadPartner = async () => {
       const { data, error } = await supabase
         .from("partners")
         .select("*")
@@ -39,8 +37,37 @@ export default function PartnerProfile({ partnerId, navigate }) {
       if (!error && data) setPartner(data);
       setLoading(false);
     };
-    load();
+    loadPartner();
   }, [partnerId]);
+
+  const loadComms = async () => {
+    if (!partnerId) return;
+    setCommLoading(true);
+    const { data, error } = await supabase
+      .from("communications")
+      .select("*")
+      .eq("partner_id", partnerId)
+      .order("created_at", { ascending: false });
+    if (!error) setCommLog(data || []);
+    setCommLoading(false);
+  };
+
+  useEffect(() => { loadComms(); }, [partnerId]);
+
+  const handleSaveInteraction = async () => {
+    if (!note.trim()) return;
+    setSaving(true);
+    const { error } = await supabase.from("communications").insert({
+      partner_id: partnerId,
+      type: commType,
+      notes: note.trim(),
+    });
+    setSaving(false);
+    if (!error) {
+      setNote("");
+      loadComms();
+    }
+  };
 
   if (loading) return (
     <div style={{ textAlign: "center", padding: "80px 0", color: "#a0c8e8", fontSize: 18 }}>
@@ -179,19 +206,24 @@ export default function PartnerProfile({ partnerId, navigate }) {
                 color: "#ffffff", outline: "none", resize: "vertical", boxSizing: "border-box",
                 fontFamily: "inherit", lineHeight: 1.6
               }} />
-            <button style={{
+            <button onClick={handleSaveInteraction} disabled={saving || !note.trim()} style={{
               marginTop: 10, width: "100%", padding: "10px 0", borderRadius: 10,
-              background: "linear-gradient(135deg, #3a9ad9, #2a7ab8)", color: "white",
-              border: "none", fontSize: 15, fontWeight: 600, cursor: "pointer"
-            }}>Save Interaction</button>
+              background: saving || !note.trim() ? "rgba(80,160,230,0.2)" : "linear-gradient(135deg, #3a9ad9, #2a7ab8)",
+              color: "white", border: "none", fontSize: 15, fontWeight: 600,
+              cursor: saving || !note.trim() ? "default" : "pointer"
+            }}>{saving ? "Saving..." : "Save Interaction"}</button>
           </Card>
           <Card>
             <div style={{ fontSize: 14, fontWeight: 600, color: "#a0c8e8", letterSpacing: "0.08em", marginBottom: 14 }}>COMMUNICATION LOG</div>
-            {COMM_LOG.map(c => (
+            {commLoading && <p style={{ color: "#7ab0cc", fontSize: 14 }}>Loading...</p>}
+            {!commLoading && commLog.length === 0 && (
+              <p style={{ fontSize: 14, color: "#7ab0cc", textAlign: "center", padding: "20px 0" }}>No interactions logged yet.</p>
+            )}
+            {commLog.map(c => (
               <div key={c.id} style={{ paddingBottom: 14, marginBottom: 14, borderBottom: "1px solid rgba(100,160,220,0.22)" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
                   <span style={{ fontSize: 14, fontWeight: 600, background: "rgba(100,160,220,0.3)", color: "#5ab0f0", padding: "2px 9px", borderRadius: 20 }}>{c.type}</span>
-                  <span style={{ fontSize: 13, color: "#7ab0cc" }}>{c.date}</span>
+                  <span style={{ fontSize: 13, color: "#7ab0cc" }}>{new Date(c.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</span>
                 </div>
                 <p style={{ fontSize: 15, color: "#a0c8e8", lineHeight: 1.6, margin: 0, opacity: 0.8 }}>{c.notes}</p>
               </div>

@@ -1,4 +1,4 @@
-import { Card } from "./AdminDashboard";
+﻿import { Card } from "./AdminDashboard";
 
 const MATERIALS = [
   { id: 1, title: "QR-Wegn Platform Overview", type: "PDF", size: "2.4 MB", uploaded: "May 14", assigned: 4 },
@@ -14,13 +14,13 @@ export default function TrainingPage() {
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 24 }}>
         <div>
-          <h1 style={{ fontSize: 24, fontWeight: 700, color: "#1a3a5a", margin: 0 }}>Training Materials</h1>
-          <p style={{ fontSize: 14, color: "#7aaac8", margin: "4px 0 0" }}>Manage and assign training content to partners</p>
+          <h1 style={{ fontSize: 30, fontWeight: 700, color: "#ffffff", margin: 0 }}>Training Materials</h1>
+          <p style={{ fontSize: 20, color: "#a0c8e8", margin: "4px 0 0" }}>Manage and assign training content to partners</p>
         </div>
         <button style={{
           background: "linear-gradient(135deg, #3a9ad9, #2a7ab8)", color: "white",
-          border: "none", borderRadius: 10, padding: "10px 20px", fontSize: 14,
-          fontWeight: 600, cursor: "pointer", boxShadow: "0 4px 12px rgba(42,122,184,0.25)"
+          border: "none", borderRadius: 10, padding: "10px 20px", fontSize: 20,
+          fontWeight: 600, cursor: "pointer", boxShadow: "0 4px 12px rgba(80,160,230,0.4)"
         }}>+ Upload Material</button>
       </div>
 
@@ -30,26 +30,26 @@ export default function TrainingPage() {
             <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
               <div style={{
                 width: 40, height: 40, borderRadius: 10,
-                background: m.type === "Video" ? "rgba(160,100,220,0.1)" : "rgba(42,122,184,0.08)",
+                background: m.type === "Video" ? "rgba(160,100,220,0.1)" : "rgba(80,160,230,0.18)",
                 display: "flex", alignItems: "center", justifyContent: "center",
-                fontSize: 18, flexShrink: 0
-              }}>{m.type === "Video" ? "▷" : "◻"}</div>
+                fontSize: 24, flexShrink: 0
+              }}>{m.type === "Video" ? "â–·" : "â—»"}</div>
               <div>
                 <span style={{
-                  fontSize: 10, fontWeight: 700, letterSpacing: "0.08em",
-                  color: m.type === "Video" ? "#6a30aa" : "#2a7ab8",
-                  background: m.type === "Video" ? "rgba(160,100,220,0.1)" : "rgba(42,122,184,0.08)",
+                  fontSize: 16, fontWeight: 700, letterSpacing: "0.08em",
+                  color: m.type === "Video" ? "#c080f0" : "#5ab0f0",
+                  background: m.type === "Video" ? "rgba(160,100,220,0.1)" : "rgba(80,160,230,0.18)",
                   padding: "2px 7px", borderRadius: 20
                 }}>{m.type.toUpperCase()}</span>
               </div>
             </div>
-            <div style={{ fontSize: 14, fontWeight: 600, color: "#1a3a5a", marginBottom: 4 }}>{m.title}</div>
-            <div style={{ fontSize: 12, color: "#9abccc", marginBottom: 14 }}>{m.size} · Uploaded {m.uploaded}</div>
+            <div style={{ fontSize: 20, fontWeight: 600, color: "#ffffff", marginBottom: 4 }}>{m.title}</div>
+            <div style={{ fontSize: 18, color: "#7ab0cc", marginBottom: 14 }}>{m.size} Â· Uploaded {m.uploaded}</div>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <span style={{ fontSize: 12, color: "#7aaac8" }}>{m.assigned} partners assigned</span>
+              <span style={{ fontSize: 18, color: "#a0c8e8" }}>{m.assigned} partners assigned</span>
               <div style={{ display: "flex", gap: 8 }}>
-                <button style={{ fontSize: 12, color: "#2a7ab8", background: "none", border: "none", cursor: "pointer", fontWeight: 500 }}>Assign</button>
-                <button style={{ fontSize: 12, color: "#9abccc", background: "none", border: "none", cursor: "pointer" }}>Edit</button>
+                <button style={{ fontSize: 18, color: "#5ab0f0", background: "none", border: "none", cursor: "pointer", fontWeight: 500 }}>Assign</button>
+                <button style={{ fontSize: 18, color: "#7ab0cc", background: "none", border: "none", cursor: "pointer" }}>Edit</button>
               </div>
             </div>
           </Card>

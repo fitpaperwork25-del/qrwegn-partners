@@ -1,4 +1,4 @@
-import { useState } from "react";
+﻿import { useState } from "react";
 import { supabase } from "../lib/supabase";
 
 export default function LoginPage({ onLogin }) {
@@ -59,79 +59,79 @@ export default function LoginPage({ onLogin }) {
   return (
     <div style={{
       minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center",
-      background: "linear-gradient(160deg, #c8e8f8 0%, #dbeeff 25%, #e8f4fd 50%, #d4ecfb 75%, #eaf6ff 100%)",
+      background: "linear-gradient(160deg, #050d1a 0%, #0a1525 25%, #0d1a30 50%, #081020 75%, #060e1c 100%)",
       position: "relative", overflow: "hidden"
     }}>
-      <div style={{ position: "absolute", top: -100, right: -100, width: 500, height: 500, borderRadius: "50%", background: "rgba(180,220,255,0.25)", pointerEvents: "none" }} />
-      <div style={{ position: "absolute", bottom: -80, left: -80, width: 400, height: 400, borderRadius: "50%", background: "rgba(160,210,250,0.2)", pointerEvents: "none" }} />
-      <div style={{ position: "absolute", top: "30%", left: "10%", width: 200, height: 200, borderRadius: "50%", background: "rgba(200,230,255,0.3)", pointerEvents: "none" }} />
+      <div style={{ position: "absolute", top: -100, right: -100, width: 500, height: 500, borderRadius: "50%", background: "rgba(30,60,120,0.2)", pointerEvents: "none" }} />
+      <div style={{ position: "absolute", bottom: -80, left: -80, width: 400, height: 400, borderRadius: "50%", background: "rgba(20,50,100,0.15)", pointerEvents: "none" }} />
+      <div style={{ position: "absolute", top: "30%", left: "10%", width: 200, height: 200, borderRadius: "50%", background: "rgba(20,50,100,0.2)", pointerEvents: "none" }} />
 
       <div style={{
-        background: "rgba(255,255,255,0.75)", backdropFilter: "blur(24px)",
+        background: "rgba(10,20,45,0.95)", backdropFilter: "blur(24px)",
         borderRadius: 20, padding: "48px 44px", width: 400,
-        boxShadow: "0 8px 48px rgba(100,160,220,0.15), 0 2px 8px rgba(100,160,220,0.08)",
-        border: "1px solid rgba(255,255,255,0.9)", position: "relative", zIndex: 10
+        boxShadow: "0 8px 48px rgba(100,160,220,0.32), 0 2px 8px rgba(100,160,220,0.22)",
+        border: "1px solid rgba(50,80,140,0.4)", position: "relative", zIndex: 10
       }}>
         <div style={{ textAlign: "center", marginBottom: 32 }}>
           <img src="/Logo.png" alt="QR-Wegn" style={{ width: 180, display: "block", margin: "0 auto 16px" }} />
-          <p style={{ fontSize: 14, color: "#7aaac8", margin: 0, letterSpacing: "0.04em" }}>
+          <p style={{ fontSize: 20, color: "#a0c8e8", margin: 0, letterSpacing: "0.04em" }}>
             Partner Network Portal
           </p>
         </div>
 
         <div style={{
-          display: "flex", background: "rgba(100,160,220,0.08)", borderRadius: 10,
+          display: "flex", background: "rgba(100,160,220,0.22)", borderRadius: 10,
           padding: 4, marginBottom: 24, gap: 4
         }}>
           {["admin", "partner"].map(m => (
             <button key={m} onClick={() => setMode(m)} style={{
               flex: 1, padding: "8px 0", borderRadius: 8, border: "none", cursor: "pointer",
               background: mode === m ? "white" : "transparent",
-              color: mode === m ? "#2a7ab8" : "#7aaac8",
-              fontSize: 13, fontWeight: mode === m ? 600 : 400,
-              boxShadow: mode === m ? "0 1px 4px rgba(100,160,220,0.15)" : "none",
+              color: mode === m ? "#5ab0f0" : "#a0c8e8",
+              fontSize: 19, fontWeight: mode === m ? 600 : 400,
+              boxShadow: mode === m ? "0 1px 4px rgba(100,160,220,0.32)" : "none",
               transition: "all 0.15s", textTransform: "capitalize"
             }}>{m === "admin" ? "Admin" : "Partner"}</button>
           ))}
         </div>
 
         <div style={{ marginBottom: 16 }}>
-          <label style={{ fontSize: 12, color: "#7aaac8", display: "block", marginBottom: 6, fontWeight: 500, letterSpacing: "0.06em" }}>EMAIL</label>
+          <label style={{ fontSize: 18, color: "#a0c8e8", display: "block", marginBottom: 6, fontWeight: 500, letterSpacing: "0.06em" }}>EMAIL</label>
           <input value={email} onChange={e => setEmail(e.target.value)}
             placeholder={mode === "admin" ? "info@qrwegn.com" : "partner@email.com"}
             style={{
-              width: "100%", padding: "12px 14px", borderRadius: 10, fontSize: 14,
-              border: "1.5px solid rgba(100,160,220,0.2)", background: "rgba(255,255,255,0.8)",
-              color: "#1a3a5a", outline: "none", boxSizing: "border-box"
+              width: "100%", padding: "12px 14px", borderRadius: 10, fontSize: 20,
+              border: "1.5px solid rgba(100,160,220,0.35)", background: "rgba(8,16,36,0.95)",
+              color: "#ffffff", outline: "none", boxSizing: "border-box"
             }} />
         </div>
 
         <div style={{ marginBottom: 18 }}>
-          <label style={{ fontSize: 12, color: "#7aaac8", display: "block", marginBottom: 6, fontWeight: 500, letterSpacing: "0.06em" }}>PASSWORD</label>
+          <label style={{ fontSize: 18, color: "#a0c8e8", display: "block", marginBottom: 6, fontWeight: 500, letterSpacing: "0.06em" }}>PASSWORD</label>
           <input type="password" value={password} onChange={e => setPassword(e.target.value)}
-            placeholder="••••••••"
+            placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢"
             style={{
-              width: "100%", padding: "12px 14px", borderRadius: 10, fontSize: 14,
-              border: "1.5px solid rgba(100,160,220,0.2)", background: "rgba(255,255,255,0.8)",
-              color: "#1a3a5a", outline: "none", boxSizing: "border-box"
+              width: "100%", padding: "12px 14px", borderRadius: 10, fontSize: 20,
+              border: "1.5px solid rgba(100,160,220,0.35)", background: "rgba(8,16,36,0.95)",
+              color: "#ffffff", outline: "none", boxSizing: "border-box"
             }} />
         </div>
 
         <div style={{ textAlign: "right", marginTop: -10, marginBottom: 16 }}>
           <button onClick={handleForgotPassword} style={{
             background: "none", border: "none", cursor: "pointer",
-            color: "#7aaac8", fontSize: 12, padding: 0, textDecoration: "underline"
+            color: "#a0c8e8", fontSize: 18, padding: 0, textDecoration: "underline"
           }}>Forgot password?</button>
         </div>
 
         {resetSent && (
-          <p style={{ color: "#2a7ab8", fontSize: 13, marginBottom: 16 }}>
+          <p style={{ color: "#5ab0f0", fontSize: 19, marginBottom: 16 }}>
             Password reset email sent. Check your inbox.
           </p>
         )}
 
         {error && (
-          <p style={{ color: "#b00020", fontSize: 13, marginBottom: 16 }}>
+          <p style={{ color: "#ff6666", fontSize: 19, marginBottom: 16 }}>
             {error}
           </p>
         )}
@@ -139,15 +139,15 @@ export default function LoginPage({ onLogin }) {
         <button onClick={handleLogin} disabled={loading} style={{
           width: "100%", padding: "13px 0", borderRadius: 10, border: "none",
           background: loading ? "rgba(100,160,220,0.4)" : "linear-gradient(135deg, #3a9ad9, #2a7ab8)",
-          color: "white", fontSize: 15, fontWeight: 600, cursor: loading ? "default" : "pointer",
-          boxShadow: "0 4px 16px rgba(42,122,184,0.3)", transition: "all 0.2s",
+          color: "white", fontSize: 21, fontWeight: 600, cursor: loading ? "default" : "pointer",
+          boxShadow: "0 4px 16px rgba(80,160,230,0.45)", transition: "all 0.2s",
           letterSpacing: "0.02em"
         }}>
           {loading ? "Signing in..." : "Sign In"}
         </button>
 
-        <p style={{ textAlign: "center", fontSize: 12, color: "#9abccc", marginTop: 20, marginBottom: 0 }}>
-          QR-Wegn · ወግን · Partner Network
+        <p style={{ textAlign: "center", fontSize: 18, color: "#7ab0cc", marginTop: 20, marginBottom: 0 }}>
+          QR-Wegn Â· á‹ˆáŒáŠ• Â· Partner Network
         </p>
       </div>
     </div>

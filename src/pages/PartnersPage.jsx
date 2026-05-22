@@ -1,28 +1,95 @@
-import { useState } from "react";
-import { MOCK_PARTNERS, STAGE_COLORS, STAGES, StageBadge, Card } from "./AdminDashboard";
+import { useState, useEffect } from "react";
+import { supabase } from "../lib/supabase";
+import { STAGE_COLORS, STAGES, StageBadge, Card } from "./AdminDashboard";
+
+const EMPTY_FORM = {
+  full_name: "", email: "", phone: "", territory: "",
+  languages: "", source: "", stage: "Identified",
+  market_tier: "entry", commission_rate: 20,
+};
 
 export default function PartnersPage({ navigate }) {
+  const [partners, setPartners] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [view, setView] = useState("list");
   const [filterStage, setFilterStage] = useState("All");
   const [search, setSearch] = useState("");
+  const [showModal, setShowModal] = useState(false);
+  const [form, setForm] = useState(EMPTY_FORM);
+  const [saving, setSaving] = useState(false);
+  const [formError, setFormError] = useState("");
 
-  const filtered = MOCK_PARTNERS.filter(p => {
+  const loadPartners = async () => {
+    setLoading(true);
+    const { data, error } = await supabase
+      .from("partners")
+      .select("*")
+      .order("created_at", { ascending: false });
+    if (!error) setPartners(data || []);
+    setLoading(false);
+  };
+
+  useEffect(() => { loadPartners(); }, []);
+
+  const handleSave = async () => {
+    if (!form.full_name.trim()) { setFormError("Full name is required."); return; }
+    setSaving(true);
+    setFormError("");
+
+    const languages = form.languages
+      ? form.languages.split(",").map(l => l.trim()).filter(Boolean)
+      : [];
+
+    const { error } = await supabase.from("partners").insert({
+      full_name: form.full_name.trim(),
+      email: form.email.trim() || null,
+      phone: form.phone.trim() || null,
+      territory: form.territory.trim() || null,
+      languages,
+      source: form.source.trim() || null,
+      stage: form.stage,
+      market_tier: form.market_tier,
+      commission_rate: Number(form.commission_rate),
+    });
+
+    setSaving(false);
+    if (error) { setFormError(error.message); return; }
+    setShowModal(false);
+    setForm(EMPTY_FORM);
+    loadPartners();
+  };
+
+  const filtered = partners.filter(p => {
     const matchStage = filterStage === "All" || p.stage === filterStage;
-    const matchSearch = p.name.toLowerCase().includes(search.toLowerCase()) || p.territory.toLowerCase().includes(search.toLowerCase());
+    const name = p.full_name || "";
+    const territory = p.territory || "";
+    const matchSearch = name.toLowerCase().includes(search.toLowerCase()) ||
+      territory.toLowerCase().includes(search.toLowerCase());
     return matchStage && matchSearch;
   });
+
+  const inputStyle = {
+    width: "100%", padding: "10px 12px", borderRadius: 8, fontSize: 15,
+    border: "1.5px solid rgba(100,160,220,0.35)", background: "rgba(8,16,36,0.95)",
+    color: "#ffffff", outline: "none", boxSizing: "border-box",
+  };
+
+  const labelStyle = {
+    fontSize: 12, color: "#a0c8e8", fontWeight: 600,
+    letterSpacing: "0.06em", display: "block", marginBottom: 5,
+  };
 
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 24 }}>
         <div>
-          <h1 style={{ fontSize: 24, fontWeight: 700, color: "#1a3a5a", margin: 0 }}>Partners</h1>
-          <p style={{ fontSize: 14, color: "#7aaac8", margin: "4px 0 0" }}>{MOCK_PARTNERS.length} total partners in pipeline</p>
+          <h1 style={{ fontSize: 30, fontWeight: 700, color: "#ffffff", margin: 0 }}>Partners</h1>
+          <p style={{ fontSize: 20, color: "#a0c8e8", margin: "4px 0 0" }}>{partners.length} total partners in pipeline</p>
         </div>
-        <button style={{
+        <button onClick={() => { setForm(EMPTY_FORM); setFormError(""); setShowModal(true); }} style={{
           background: "linear-gradient(135deg, #3a9ad9, #2a7ab8)", color: "white",
-          border: "none", borderRadius: 10, padding: "10px 20px", fontSize: 14,
-          fontWeight: 600, cursor: "pointer", boxShadow: "0 4px 12px rgba(42,122,184,0.25)"
+          border: "none", borderRadius: 10, padding: "10px 20px", fontSize: 20,
+          fontWeight: 600, cursor: "pointer", boxShadow: "0 4px 12px rgba(80,160,230,0.4)"
         }}>+ Add Partner</button>
       </div>
 
@@ -31,76 +98,75 @@ export default function PartnersPage({ navigate }) {
         <input value={search} onChange={e => setSearch(e.target.value)}
           placeholder="Search partners..."
           style={{
-            flex: 1, padding: "10px 14px", borderRadius: 10, fontSize: 14,
-            border: "1.5px solid rgba(100,160,220,0.2)", background: "rgba(255,255,255,0.7)",
-            color: "#1a3a5a", outline: "none"
+            flex: 1, padding: "10px 14px", borderRadius: 10, fontSize: 20,
+            border: "1.5px solid rgba(100,160,220,0.35)", background: "rgba(8,16,36,0.9)",
+            color: "#ffffff", outline: "none"
           }} />
         <select value={filterStage} onChange={e => setFilterStage(e.target.value)}
           style={{
-            padding: "10px 14px", borderRadius: 10, fontSize: 13,
-            border: "1.5px solid rgba(100,160,220,0.2)", background: "rgba(255,255,255,0.7)",
-            color: "#1a3a5a", outline: "none"
+            padding: "10px 14px", borderRadius: 10, fontSize: 19,
+            border: "1.5px solid rgba(100,160,220,0.35)", background: "rgba(8,16,36,0.9)",
+            color: "#ffffff", outline: "none"
           }}>
           <option>All</option>
           {STAGES.map(s => <option key={s}>{s}</option>)}
         </select>
-        <div style={{ display: "flex", background: "rgba(255,255,255,0.6)", borderRadius: 10, border: "1px solid rgba(100,160,220,0.15)" }}>
+        <div style={{ display: "flex", background: "rgba(8,16,36,0.85)", borderRadius: 10, border: "1px solid rgba(100,160,220,0.32)" }}>
           {["list", "board"].map(v => (
             <button key={v} onClick={() => setView(v)} style={{
               padding: "8px 16px", borderRadius: 8, border: "none", cursor: "pointer",
-              background: view === v ? "rgba(42,122,184,0.12)" : "transparent",
-              color: view === v ? "#2a7ab8" : "#9abccc", fontSize: 13, fontWeight: view === v ? 600 : 400,
+              background: view === v ? "rgba(80,160,230,0.22)" : "transparent",
+              color: view === v ? "#5ab0f0" : "#7ab0cc", fontSize: 19, fontWeight: view === v ? 600 : 400,
               textTransform: "capitalize"
             }}>{v}</button>
           ))}
         </div>
       </div>
 
-      {view === "list" ? (
+      {loading ? (
+        <div style={{ textAlign: "center", padding: "60px 0", color: "#a0c8e8", fontSize: 18 }}>Loading partners...</div>
+      ) : view === "list" ? (
         <Card style={{ padding: 0, overflow: "hidden" }}>
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead>
-              <tr style={{ borderBottom: "1px solid rgba(100,160,220,0.1)" }}>
-                {["Partner", "Territory", "Languages", "Stage", "Last Contact", "Next Followup", ""].map(h => (
-                  <th key={h} style={{ padding: "12px 18px", textAlign: "left", fontSize: 11, color: "#7aaac8", fontWeight: 600, letterSpacing: "0.06em" }}>{h.toUpperCase()}</th>
+              <tr style={{ borderBottom: "1px solid rgba(100,160,220,0.3)" }}>
+                {["Partner", "Territory", "Languages", "Stage", "Source", "Commission", ""].map(h => (
+                  <th key={h} style={{ padding: "12px 18px", textAlign: "left", fontSize: 17, color: "#a0c8e8", fontWeight: 600, letterSpacing: "0.06em" }}>{h.toUpperCase()}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {filtered.map((p, i) => (
-                <tr key={p.id} style={{ borderBottom: i < filtered.length - 1 ? "1px solid rgba(100,160,220,0.06)" : "none", transition: "background 0.1s" }}
+              {filtered.length === 0 ? (
+                <tr><td colSpan={7} style={{ padding: "40px 18px", textAlign: "center", color: "#7ab0cc", fontSize: 18 }}>No partners found</td></tr>
+              ) : filtered.map((p, i) => (
+                <tr key={p.id} style={{ borderBottom: i < filtered.length - 1 ? "1px solid rgba(100,160,220,0.22)" : "none", transition: "background 0.1s" }}
                   onMouseEnter={e => e.currentTarget.style.background = "rgba(100,160,220,0.04)"}
                   onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
                   <td style={{ padding: "14px 18px" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                       <div style={{
                         width: 36, height: 36, borderRadius: "50%",
-                        background: "linear-gradient(135deg, #c8e8f8, #a0ccf0)",
+                        background: "linear-gradient(135deg, #1a3560, #0d2045)",
                         display: "flex", alignItems: "center", justifyContent: "center",
-                        fontSize: 13, fontWeight: 700, color: "#2a7ab8", flexShrink: 0
-                      }}>{p.name.split(" ").map(n => n[0]).join("")}</div>
-                      <span style={{ fontSize: 14, fontWeight: 600, color: "#1a3a5a" }}>{p.name}</span>
+                        fontSize: 19, fontWeight: 700, color: "#5ab0f0", flexShrink: 0
+                      }}>{(p.full_name || "?").split(" ").map(n => n[0]).join("").slice(0, 2)}</div>
+                      <span style={{ fontSize: 20, fontWeight: 600, color: "#ffffff" }}>{p.full_name}</span>
                     </div>
                   </td>
-                  <td style={{ padding: "14px 18px", fontSize: 13, color: "#4a7a9a" }}>{p.territory}</td>
+                  <td style={{ padding: "14px 18px", fontSize: 19, color: "#b0cce0" }}>{p.territory || "—"}</td>
                   <td style={{ padding: "14px 18px" }}>
                     <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
-                      {p.languages.map(l => (
-                        <span key={l} style={{ fontSize: 11, background: "rgba(100,160,220,0.08)", color: "#4a7aaa", padding: "2px 7px", borderRadius: 20 }}>{l}</span>
+                      {(p.languages || []).map(l => (
+                        <span key={l} style={{ fontSize: 17, background: "rgba(100,160,220,0.22)", color: "#90bcd8", padding: "2px 7px", borderRadius: 20 }}>{l}</span>
                       ))}
                     </div>
                   </td>
-                  <td style={{ padding: "14px 18px" }}><StageBadge stage={p.stage} /></td>
-                  <td style={{ padding: "14px 18px", fontSize: 13, color: "#7aaac8" }}>{p.lastContact}</td>
-                  <td style={{ padding: "14px 18px" }}>
-                    <span style={{
-                      fontSize: 12, fontWeight: 500,
-                      color: p.nextFollowup === "Overdue" ? "#c03030" : p.nextFollowup === "Tomorrow" ? "#9a6a10" : "#4a7a9a"
-                    }}>{p.nextFollowup}</span>
-                  </td>
+                  <td style={{ padding: "14px 18px" }}><StageBadge stage={p.stage || "Identified"} /></td>
+                  <td style={{ padding: "14px 18px", fontSize: 19, color: "#a0c8e8" }}>{p.source || "—"}</td>
+                  <td style={{ padding: "14px 18px", fontSize: 19, color: "#a0c8e8" }}>{p.commission_rate}%</td>
                   <td style={{ padding: "14px 18px" }}>
                     <button onClick={() => navigate("partner-profile", { partnerId: p.id })}
-                      style={{ fontSize: 12, color: "#2a7ab8", background: "none", border: "none", cursor: "pointer", fontWeight: 600 }}>
+                      style={{ fontSize: 18, color: "#5ab0f0", background: "none", border: "none", cursor: "pointer", fontWeight: 600 }}>
                       View →
                     </button>
                   </td>
@@ -110,39 +176,115 @@ export default function PartnersPage({ navigate }) {
           </table>
         </Card>
       ) : (
-        /* Board view */
         <div style={{ display: "flex", gap: 12, overflowX: "auto", paddingBottom: 8 }}>
-          {STAGES.filter(s => !["Declined"].includes(s)).map(stage => {
+          {STAGES.filter(s => s !== "Declined").map(stage => {
             const c = STAGE_COLORS[stage];
             const stagePartners = filtered.filter(p => p.stage === stage);
             return (
               <div key={stage} style={{ minWidth: 200, flex: "0 0 200px" }}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: c.color, letterSpacing: "0.08em", marginBottom: 10, display: "flex", justifyContent: "space-between" }}>
+                <div style={{ fontSize: 17, fontWeight: 700, color: c.color, letterSpacing: "0.08em", marginBottom: 10, display: "flex", justifyContent: "space-between" }}>
                   <span>{stage.toUpperCase()}</span>
                   <span style={{ background: c.bg, padding: "1px 8px", borderRadius: 20 }}>{stagePartners.length}</span>
                 </div>
                 {stagePartners.map(p => (
                   <div key={p.id} onClick={() => navigate("partner-profile", { partnerId: p.id })}
                     style={{
-                      background: "rgba(255,255,255,0.75)", borderRadius: 10, padding: "12px 14px",
-                      marginBottom: 8, cursor: "pointer", border: "1px solid rgba(255,255,255,0.9)",
-                      boxShadow: "0 1px 8px rgba(100,160,220,0.08)"
+                      background: "rgba(10,20,45,0.95)", borderRadius: 10, padding: "12px 14px",
+                      marginBottom: 8, cursor: "pointer", border: "1px solid rgba(50,80,140,0.4)",
+                      boxShadow: "0 1px 8px rgba(100,160,220,0.22)"
                     }}>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: "#1a3a5a", marginBottom: 4 }}>{p.name}</div>
-                    <div style={{ fontSize: 11, color: "#7aaac8" }}>{p.territory}</div>
-                    <div style={{ fontSize: 11, color: p.nextFollowup === "Overdue" ? "#c03030" : "#9abccc", marginTop: 6 }}>
-                      ↻ {p.nextFollowup}
-                    </div>
+                    <div style={{ fontSize: 19, fontWeight: 600, color: "#ffffff", marginBottom: 4 }}>{p.full_name}</div>
+                    <div style={{ fontSize: 17, color: "#a0c8e8" }}>{p.territory || "—"}</div>
                   </div>
                 ))}
                 {stagePartners.length === 0 && (
-                  <div style={{ fontSize: 12, color: "#c0d8e8", textAlign: "center", padding: "20px 0", background: "rgba(255,255,255,0.3)", borderRadius: 10, border: "1px dashed rgba(100,160,220,0.2)" }}>
+                  <div style={{ fontSize: 18, color: "#40607a", textAlign: "center", padding: "20px 0", background: "rgba(8,16,36,0.5)", borderRadius: 10, border: "1px dashed rgba(100,160,220,0.35)" }}>
                     Empty
                   </div>
                 )}
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* Add Partner Modal */}
+      {showModal && (
+        <div style={{
+          position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", backdropFilter: "blur(4px)",
+          display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000
+        }} onClick={e => { if (e.target === e.currentTarget) setShowModal(false); }}>
+          <div style={{
+            background: "#0d1a35", border: "1px solid rgba(90,160,255,0.2)", borderRadius: 16,
+            padding: "32px 36px", width: 520, maxHeight: "90vh", overflowY: "auto",
+            boxShadow: "0 24px 80px rgba(0,0,0,0.6)"
+          }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
+              <h2 style={{ fontSize: 22, fontWeight: 700, color: "#ffffff", margin: 0 }}>Add Partner</h2>
+              <button onClick={() => setShowModal(false)} style={{ background: "none", border: "none", color: "#7ab0cc", fontSize: 22, cursor: "pointer", lineHeight: 1 }}>×</button>
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+              <div style={{ gridColumn: "1 / -1" }}>
+                <label style={labelStyle}>FULL NAME *</label>
+                <input style={inputStyle} value={form.full_name} onChange={e => setForm(f => ({ ...f, full_name: e.target.value }))} placeholder="e.g. Meron Tesfaye" />
+              </div>
+              <div>
+                <label style={labelStyle}>EMAIL</label>
+                <input style={inputStyle} value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} placeholder="email@example.com" />
+              </div>
+              <div>
+                <label style={labelStyle}>PHONE</label>
+                <input style={inputStyle} value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} placeholder="+1 555 000 0000" />
+              </div>
+              <div style={{ gridColumn: "1 / -1" }}>
+                <label style={labelStyle}>TERRITORY</label>
+                <input style={inputStyle} value={form.territory} onChange={e => setForm(f => ({ ...f, territory: e.target.value }))} placeholder="e.g. Minnesota / Twin Cities" />
+              </div>
+              <div style={{ gridColumn: "1 / -1" }}>
+                <label style={labelStyle}>LANGUAGES (comma-separated)</label>
+                <input style={inputStyle} value={form.languages} onChange={e => setForm(f => ({ ...f, languages: e.target.value }))} placeholder="e.g. Amharic, English" />
+              </div>
+              <div style={{ gridColumn: "1 / -1" }}>
+                <label style={labelStyle}>SOURCE</label>
+                <input style={inputStyle} value={form.source} onChange={e => setForm(f => ({ ...f, source: e.target.value }))} placeholder="e.g. Referral, Event, Social" />
+              </div>
+              <div>
+                <label style={labelStyle}>STAGE</label>
+                <select style={inputStyle} value={form.stage} onChange={e => setForm(f => ({ ...f, stage: e.target.value }))}>
+                  {STAGES.map(s => <option key={s}>{s}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={labelStyle}>MARKET TIER</label>
+                <select style={inputStyle} value={form.market_tier} onChange={e => setForm(f => ({ ...f, market_tier: e.target.value }))}>
+                  <option value="entry">Entry</option>
+                  <option value="standard">Standard</option>
+                  <option value="premium">Premium</option>
+                </select>
+              </div>
+              <div>
+                <label style={labelStyle}>COMMISSION RATE (%)</label>
+                <input style={inputStyle} type="number" min={0} max={100} value={form.commission_rate} onChange={e => setForm(f => ({ ...f, commission_rate: e.target.value }))} />
+              </div>
+            </div>
+
+            {formError && (
+              <p style={{ color: "#ff6666", fontSize: 14, marginTop: 16, marginBottom: 0 }}>{formError}</p>
+            )}
+
+            <div style={{ display: "flex", gap: 12, marginTop: 24 }}>
+              <button onClick={() => setShowModal(false)} style={{
+                flex: 1, padding: "12px 0", borderRadius: 10, border: "1px solid rgba(100,160,220,0.3)",
+                background: "transparent", color: "#a0c8e8", fontSize: 16, cursor: "pointer"
+              }}>Cancel</button>
+              <button onClick={handleSave} disabled={saving} style={{
+                flex: 2, padding: "12px 0", borderRadius: 10, border: "none",
+                background: saving ? "rgba(80,160,230,0.4)" : "linear-gradient(135deg, #3a9ad9, #2a7ab8)",
+                color: "white", fontSize: 16, fontWeight: 600, cursor: saving ? "default" : "pointer"
+              }}>{saving ? "Saving..." : "Save Partner"}</button>
+            </div>
+          </div>
         </div>
       )}
     </div>

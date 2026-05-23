@@ -56,10 +56,10 @@ export default function PartnerProfile({ partnerId, navigate }) {
       setTrainingLoading(true);
       console.log("Loading training for partnerId:", partnerId);
       const { data, error } = await supabase
-        .from("training_assignments")
+        .from("partner_training")
         .select("*")
         .eq("partner_id", partnerId);
-      console.log("training_assignments data:", data, "error:", error);
+      console.log("partner_training data:", data, "error:", error);
       if (error) setTrainingError(error.message);
       setTraining(data || []);
       setTrainingLoading(false);

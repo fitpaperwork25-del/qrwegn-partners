@@ -148,14 +148,14 @@ function AdminLayout({ children, page, navigate, onLogout, profile }) {
   return (
     <div style={{ display: "flex", minHeight: "100vh", background: "linear-gradient(135deg, #e8f4fd 0%, #dbeeff 30%, #e4f0fb 60%, #f0f8ff 100%)" }}>
       <aside style={{
-        width: 220, background: "rgba(255,255,255,0.72)", backdropFilter: "blur(20px)",
-        borderRight: "1px solid rgba(255,255,255,0.9)", display: "flex", flexDirection: "column",
+        width: 220, background: "#0B1739",
+        borderRight: "1px solid rgba(255,255,255,0.08)", display: "flex", flexDirection: "column",
         position: "fixed", top: 0, left: 0, height: "100vh", zIndex: 100,
-        boxShadow: "2px 0 20px rgba(100,160,220,0.08)"
+        boxShadow: "2px 0 24px rgba(0,0,0,0.3)"
       }}>
-        <div style={{ padding: "24px 20px 20px", borderBottom: "1px solid rgba(100,160,220,0.12)" }}>
+        <div style={{ padding: "24px 20px 20px", borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
           <img src="/Logo.png" alt="QR-Wegn" style={{ width: 140, display: "block" }} />
-          <div style={{ fontSize: 11, color: "#7aaac8", marginTop: 8, letterSpacing: "0.08em", fontWeight: 500 }}>
+          <div style={{ fontSize: 11, color: "rgba(255,255,255,0.4)", marginTop: 8, letterSpacing: "0.08em", fontWeight: 500 }}>
             PARTNER NETWORK
           </div>
         </div>
@@ -166,8 +166,8 @@ function AdminLayout({ children, page, navigate, onLogout, profile }) {
               style={{
                 display: "flex", alignItems: "center", gap: 10, width: "100%",
                 padding: "10px 12px", borderRadius: 10, border: "none", cursor: "pointer",
-                background: page === item.id ? "rgba(100,160,220,0.15)" : "transparent",
-                color: page === item.id ? "#2a7ab8" : "#6a8eaa",
+                background: page === item.id ? "rgba(255,255,255,0.12)" : "transparent",
+                color: page === item.id ? "#ffffff" : "rgba(255,255,255,0.5)",
                 fontSize: 14, fontWeight: page === item.id ? 600 : 400,
                 marginBottom: 4, textAlign: "left", transition: "all 0.15s"
               }}>
@@ -177,13 +177,13 @@ function AdminLayout({ children, page, navigate, onLogout, profile }) {
           ))}
         </nav>
 
-        <div style={{ padding: "16px 20px", borderTop: "1px solid rgba(100,160,220,0.12)" }}>
-          <div style={{ fontSize: 12, color: "#7aaac8", marginBottom: 4 }}>Signed in as</div>
-          <div style={{ fontSize: 13, color: "#2a5a7a", fontWeight: 600 }}>
+        <div style={{ padding: "16px 20px", borderTop: "1px solid rgba(255,255,255,0.08)" }}>
+          <div style={{ fontSize: 12, color: "rgba(255,255,255,0.4)", marginBottom: 4 }}>Signed in as</div>
+          <div style={{ fontSize: 13, color: "#ffffff", fontWeight: 600 }}>
             {profile?.full_name || "Admin"}
           </div>
           <button onClick={onLogout} style={{
-            marginTop: 10, fontSize: 12, color: "#7aaac8", background: "none",
+            marginTop: 10, fontSize: 12, color: "rgba(255,255,255,0.4)", background: "none",
             border: "none", cursor: "pointer", padding: 0
           }}>Sign out →</button>
         </div>

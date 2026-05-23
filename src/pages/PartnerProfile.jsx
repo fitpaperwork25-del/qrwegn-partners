@@ -21,6 +21,8 @@ export default function PartnerProfile({ partnerId, navigate }) {
   const [training, setTraining] = useState([]);
   const [trainingLoading, setTrainingLoading] = useState(false);
   const [trainingError, setTrainingError] = useState(null);
+  const [materials, setMaterials] = useState([]);
+  const [materialsLoading, setMaterialsLoading] = useState(false);
 
   useEffect(() => {
     if (!partnerId) { setLoading(false); return; }
@@ -66,6 +68,20 @@ export default function PartnerProfile({ partnerId, navigate }) {
     };
     loadTraining();
   }, [partnerId]);
+
+  useEffect(() => {
+    const loadMaterials = async () => {
+      setMaterialsLoading(true);
+      const { data, error } = await supabase
+        .from("outreach_materials")
+        .select("*")
+        .eq("is_official", true)
+        .order("title");
+      if (!error) setMaterials(data || []);
+      setMaterialsLoading(false);
+    };
+    loadMaterials();
+  }, []);
 
   const handleSaveInteraction = async () => {
     if (!note.trim()) return;
@@ -287,20 +303,27 @@ export default function PartnerProfile({ partnerId, navigate }) {
       {activeTab === "materials" && (
         <Card>
           <div style={{ fontSize: 14, fontWeight: 600, color: "#a0c8e8", letterSpacing: "0.08em", marginBottom: 16 }}>SHARED MATERIALS</div>
-          {[
-            { title: "Partner Overview Deck", type: "PDF", shared: "May 17" },
-            { title: "QR-Wegn Demo Video", type: "Video", shared: "May 17" },
-            { title: "Commission Structure", type: "PDF", shared: "May 19" },
-          ].map((m, i) => (
-            <div key={i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 0", borderBottom: "1px solid rgba(100,160,220,0.22)" }}>
+          {materialsLoading && <p style={{ color: "#7ab0cc", fontSize: 14 }}>Loading...</p>}
+          {!materialsLoading && materials.length === 0 && (
+            <p style={{ fontSize: 14, color: "#7ab0cc", textAlign: "center", padding: "20px 0" }}>No materials available.</p>
+          )}
+          {materials.map(m => (
+            <div key={m.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 0", borderBottom: "1px solid rgba(100,160,220,0.22)" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                 <span style={{ fontSize: 20 }}>{m.type === "Video" ? "▷" : "◻"}</span>
                 <div>
                   <div style={{ fontSize: 15, fontWeight: 600, color: "#ffffff" }}>{m.title}</div>
-                  <div style={{ fontSize: 13, color: "#7ab0cc" }}>Shared {m.shared}</div>
+                  {m.description && <div style={{ fontSize: 13, color: "#7ab0cc", marginTop: 2 }}>{m.description}</div>}
+                  {m.type && <div style={{ fontSize: 12, color: "#5ab0f0", marginTop: 3, textTransform: "uppercase", letterSpacing: "0.06em" }}>{m.type}</div>}
                 </div>
               </div>
-              <button style={{ fontSize: 14, color: "#5ab0f0", background: "none", border: "none", cursor: "pointer" }}>Send again</button>
+              {m.file_url ? (
+                <a href={m.file_url} target="_blank" rel="noreferrer" style={{ fontSize: 14, color: "#5ab0f0", background: "none", border: "none", cursor: "pointer", textDecoration: "none" }}>
+                  Download →
+                </a>
+              ) : (
+                <span style={{ fontSize: 13, color: "#7ab0cc" }}>No file</span>
+              )}
             </div>
           ))}
         </Card>

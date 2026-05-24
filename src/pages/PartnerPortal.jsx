@@ -12,11 +12,13 @@ const DEFAULT_CHECKLIST = [
 const emptyLead = { business_name: "", owner_name: "", phone: "", country: "", notes: "" };
 
 const BASE_TABS = [
-  { id: "home", label: "Home" },
-  { id: "profile", label: "My Profile" },
-  { id: "training", label: "Training" },
-  { id: "materials", label: "Materials" },
-  { id: "leads", label: "Submit Lead" },
+  { id: "home",         label: "Home" },
+  { id: "profile",      label: "My Profile" },
+  { id: "my-promotors", label: "My Promotors" },
+  { id: "commissions",  label: "Commissions" },
+  { id: "training",     label: "Training" },
+  { id: "materials",    label: "Materials" },
+  { id: "leads",        label: "Submit Lead" },
 ];
 
 const STAGE_COLORS = {
@@ -87,6 +89,8 @@ export default function PartnerPortal({ profile, onLogout }) {
   const [tab, setTab] = useState("home");
   const [checklist, setChecklist] = useState([]);
   const [promotors, setPromotors] = useState([]);
+  const [commissions, setCommissions] = useState([]);
+  const [commissionsUnavailable, setCommissionsUnavailable] = useState(false);
   const [materials, setMaterials] = useState([]);
   const [training, setTraining] = useState([]);
   const [lead, setLead] = useState(emptyLead);
@@ -128,6 +132,24 @@ export default function PartnerPortal({ profile, onLogout }) {
     setMaterials(matData || []);
     setTraining(trainData || []);
     setPromotors(promotorData || []);
+
+    // Commissions — graceful fallback if table doesn't exist yet
+    try {
+      const { data: commData, error: commErr } = await supabase
+        .from("commissions")
+        .select("*")
+        .eq("partner_id", partnerId)
+        .order("created_at", { ascending: false });
+      if (commErr) {
+        console.warn("Commissions table unavailable:", commErr.message);
+        setCommissionsUnavailable(true);
+      } else {
+        setCommissions(commData || []);
+      }
+    } catch {
+      setCommissionsUnavailable(true);
+    }
+
     setLoading(false);
   };
 
@@ -223,10 +245,7 @@ export default function PartnerPortal({ profile, onLogout }) {
 
         {/* Tabs */}
         <div style={{ display: "flex", gap: 2, marginBottom: 22, background: "rgba(4,10,24,0.85)", borderRadius: 10, padding: 3, width: "fit-content", flexWrap: "wrap" }}>
-          {[
-            ...BASE_TABS,
-            ...(promotors.length > 0 ? [{ id: "my-promotors", label: "My Promotors" }] : []),
-          ].map(t => (
+          {BASE_TABS.map(t => (
             <button key={t.id} onClick={() => setTab(t.id)} style={{
               padding: "7px 15px", borderRadius: 8, border: "none", cursor: "pointer",
               background: tab === t.id ? "rgba(80,140,210,0.22)" : "transparent",
@@ -241,21 +260,6 @@ export default function PartnerPortal({ profile, onLogout }) {
         {/* HOME */}
         {tab === "home" && (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 16 }}>
-            {promotors.length > 0 && (
-              <Card style={{ gridColumn: "1 / -1", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "18px 24px", background: "rgba(80,140,210,0.08)", border: "1px solid rgba(80,140,210,0.2)" }}>
-                <div>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: "#4a7090", letterSpacing: "0.12em", marginBottom: 6 }}>MY PROMOTORS</div>
-                  <div style={{ fontSize: 28, fontWeight: 800, color: "#5ab0f0", lineHeight: 1 }}>{promotors.length}</div>
-                  <div style={{ fontSize: 12, color: "#3a5a70", marginTop: 4 }}>sub-partner{promotors.length !== 1 ? "s" : ""} under you</div>
-                </div>
-                <button
-                  onClick={() => setTab("my-promotors")}
-                  style={{ fontSize: 13, color: "#5ab0f0", background: "rgba(80,160,230,0.1)", border: "1px solid rgba(80,160,230,0.22)", borderRadius: 8, padding: "7px 14px", cursor: "pointer", fontWeight: 600 }}
-                >
-                  View team →
-                </button>
-              </Card>
-            )}
             <Card>
               <SectionLabel>ONBOARDING CHECKLIST</SectionLabel>
               {checklist.map(c => (
@@ -362,24 +366,118 @@ export default function PartnerPortal({ profile, onLogout }) {
         )}
 
         {/* MY PROMOTORS */}
-        {tab === "my-promotors" && (
+        {tab === "my-promotors" && (() => {
+          const activeCount     = promotors.filter(p => p.stage === "Active").length;
+          const bizTotal        = promotors.reduce((s, p) => s + (p.businesses_count || 0), 0);
+          const pendingComm     = commissions.filter(c => c.status === "pending").reduce((s, c) => s + (Number(c.amount) || 0), 0);
+
+          return (
+            <div>
+              {/* Summary cards */}
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 12, marginBottom: 24 }}>
+                {[
+                  { label: "Total Promotors",      value: promotors.length,                       color: "#5ab0f0" },
+                  { label: "Active Promotors",      value: activeCount,                            color: "#35c060" },
+                  { label: "Businesses Onboarded",  value: bizTotal,                               color: "#c080f0" },
+                  { label: "Pending Commissions",   value: `$${pendingComm.toLocaleString()}`,     color: "#e8c547" },
+                ].map(m => (
+                  <Card key={m.label} style={{ padding: "16px 18px" }}>
+                    <div style={{ fontSize: 10, fontWeight: 700, color: "#4a7090", letterSpacing: "0.1em", marginBottom: 8 }}>{m.label.toUpperCase()}</div>
+                    <div style={{ fontSize: 28, fontWeight: 800, color: m.color, lineHeight: 1 }}>{m.value}</div>
+                  </Card>
+                ))}
+              </div>
+
+              {/* Promotor cards */}
+              {promotors.length === 0 ? (
+                <Card style={{ textAlign: "center", padding: "52px 24px" }}>
+                  <div style={{ fontSize: 36, marginBottom: 14 }}>👥</div>
+                  <div style={{ fontSize: 16, fontWeight: 600, color: "#b0cce0", marginBottom: 8 }}>No promotors yet</div>
+                  <div style={{ fontSize: 13, color: "#4a7090" }}>Share your referral link to recruit sub-partners under you.</div>
+                </Card>
+              ) : (
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 14 }}>
+                  {promotors.map(p => (
+                    <Card key={p.id} style={{ display: "flex", flexDirection: "column", gap: 0 }}>
+                      {/* Header */}
+                      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
+                        <div style={{
+                          width: 42, height: 42, borderRadius: "50%", flexShrink: 0,
+                          background: "linear-gradient(135deg, #1a3a6a, #0d2045)",
+                          border: "1.5px solid rgba(80,140,200,0.3)",
+                          display: "flex", alignItems: "center", justifyContent: "center",
+                          fontSize: 14, fontWeight: 700, color: "#5ab0f0",
+                        }}>
+                          {(p.full_name || "?").split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase()}
+                        </div>
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{ fontSize: 14, fontWeight: 700, color: "#c0d8e8", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.full_name || "—"}</div>
+                          <div style={{ fontSize: 12, color: "#4a7090", marginTop: 2 }}>{p.territory || "No territory set"}</div>
+                        </div>
+                      </div>
+
+                      {/* Stage + commission */}
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+                        <StagePill stage={p.stage || "Identified"} />
+                        <span style={{ fontSize: 12, color: "#5a8aaa" }}>
+                          {p.commission_rate != null ? `${p.commission_rate}% commission` : "—"}
+                        </span>
+                      </div>
+
+                      {/* Stats row */}
+                      <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
+                        <div style={{ flex: 1, background: "rgba(80,130,180,0.08)", borderRadius: 8, padding: "8px 10px", textAlign: "center" }}>
+                          <div style={{ fontSize: 18, fontWeight: 700, color: "#5ab0f0" }}>{p.businesses_count || 0}</div>
+                          <div style={{ fontSize: 10, color: "#4a7090", marginTop: 2 }}>BUSINESSES</div>
+                        </div>
+                        <div style={{ flex: 1, background: "rgba(80,130,180,0.08)", borderRadius: 8, padding: "8px 10px", textAlign: "center" }}>
+                          <div style={{ fontSize: 18, fontWeight: 700, color: "#35c080" }}>{p.email ? "✓" : "—"}</div>
+                          <div style={{ fontSize: 10, color: "#4a7090", marginTop: 2 }}>CONTACT</div>
+                        </div>
+                      </div>
+
+                      {/* View button */}
+                      <button style={{
+                        marginTop: "auto", width: "100%", padding: "8px 0", borderRadius: 8,
+                        background: "rgba(80,160,230,0.1)", border: "1px solid rgba(80,160,230,0.25)",
+                        color: "#5ab0f0", fontSize: 13, fontWeight: 600, cursor: "pointer",
+                      }}>
+                        View →
+                      </button>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })()}
+
+        {/* COMMISSIONS */}
+        {tab === "commissions" && (
           <div>
             <div style={{ marginBottom: 18 }}>
-              <h2 style={{ fontSize: 18, fontWeight: 700, color: "#ffffff", margin: 0 }}>My Promotors</h2>
-              <p style={{ fontSize: 13, color: "#4a7090", margin: "4px 0 0" }}>
-                {promotors.length} sub-partner{promotors.length !== 1 ? "s" : ""} reporting to you
-              </p>
+              <h2 style={{ fontSize: 18, fontWeight: 700, color: "#ffffff", margin: 0 }}>Commissions</h2>
+              <p style={{ fontSize: 13, color: "#4a7090", margin: "4px 0 0" }}>Your earnings from referred businesses</p>
             </div>
-            <Card style={{ padding: 0, overflow: "hidden" }}>
-              {promotors.length === 0 ? (
-                <div style={{ padding: "40px 0", textAlign: "center", color: "#3a5a70", fontSize: 14 }}>
-                  No promotors assigned to you yet.
-                </div>
-              ) : (
+
+            {commissionsUnavailable ? (
+              <Card style={{ textAlign: "center", padding: "52px 24px" }}>
+                <div style={{ fontSize: 36, marginBottom: 14 }}>💰</div>
+                <div style={{ fontSize: 15, fontWeight: 600, color: "#b0cce0", marginBottom: 8 }}>Commission tracking coming soon</div>
+                <div style={{ fontSize: 13, color: "#4a7090" }}>Your commission history will appear here once the system is live.</div>
+              </Card>
+            ) : commissions.length === 0 ? (
+              <Card style={{ textAlign: "center", padding: "52px 24px" }}>
+                <div style={{ fontSize: 36, marginBottom: 14 }}>💰</div>
+                <div style={{ fontSize: 15, fontWeight: 600, color: "#b0cce0", marginBottom: 8 }}>No commissions recorded yet</div>
+                <div style={{ fontSize: 13, color: "#4a7090" }}>Commissions will appear here as businesses you referred go live.</div>
+              </Card>
+            ) : (
+              <Card style={{ padding: 0, overflow: "hidden" }}>
                 <table style={{ width: "100%", borderCollapse: "collapse" }}>
                   <thead>
                     <tr style={{ borderBottom: "1px solid rgba(50,80,140,0.25)" }}>
-                      {["Name", "Email", "Territory", "Commission", "Stage"].map(h => (
+                      {["Partner / Promotor", "Business", "Amount", "Status", "Date"].map(h => (
                         <th key={h} style={{ padding: "12px 20px", textAlign: "left", fontSize: 11, color: "#4a7090", fontWeight: 700, letterSpacing: "0.1em" }}>
                           {h.toUpperCase()}
                         </th>
@@ -387,39 +485,39 @@ export default function PartnerPortal({ profile, onLogout }) {
                     </tr>
                   </thead>
                   <tbody>
-                    {promotors.map((p, i) => (
-                      <tr key={p.id}
-                        style={{ borderBottom: i < promotors.length - 1 ? "1px solid rgba(50,80,140,0.15)" : "none", transition: "background 0.1s" }}
-                        onMouseEnter={e => e.currentTarget.style.background = "rgba(80,140,210,0.05)"}
-                        onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
-                        <td style={{ padding: "13px 20px" }}>
-                          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                            <div style={{
-                              width: 30, height: 30, borderRadius: "50%",
-                              background: "linear-gradient(135deg, #1a3a6a, #0d2045)",
-                              border: "1.5px solid rgba(80,140,200,0.3)",
-                              display: "flex", alignItems: "center", justifyContent: "center",
-                              fontSize: 11, fontWeight: 700, color: "#5ab0f0", flexShrink: 0,
+                    {commissions.map((c, i) => {
+                      const isPaid = c.status === "paid";
+                      return (
+                        <tr key={c.id}
+                          style={{ borderBottom: i < commissions.length - 1 ? "1px solid rgba(50,80,140,0.15)" : "none", transition: "background 0.1s" }}
+                          onMouseEnter={e => e.currentTarget.style.background = "rgba(80,140,210,0.05)"}
+                          onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+                          <td style={{ padding: "13px 20px", fontSize: 14, fontWeight: 600, color: "#c0d8e8" }}>{c.partner_name || c.promotor_name || "—"}</td>
+                          <td style={{ padding: "13px 20px", fontSize: 13, color: "#5a8aaa" }}>{c.business_name || "—"}</td>
+                          <td style={{ padding: "13px 20px", fontSize: 13, fontWeight: 700, color: "#ffffff" }}>
+                            ${Number(c.amount || 0).toLocaleString()}
+                          </td>
+                          <td style={{ padding: "13px 20px" }}>
+                            <span style={{
+                              fontSize: 11, fontWeight: 700,
+                              color: isPaid ? "#35c060" : "#e8c547",
+                              background: isPaid ? "rgba(53,192,96,0.1)" : "rgba(232,197,71,0.1)",
+                              border: `1px solid ${isPaid ? "rgba(53,192,96,0.25)" : "rgba(232,197,71,0.25)"}`,
+                              padding: "3px 9px", borderRadius: 20,
                             }}>
-                              {(p.full_name || "?").split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase()}
-                            </div>
-                            <span style={{ fontSize: 14, fontWeight: 600, color: "#c0d8e8" }}>{p.full_name || "—"}</span>
-                          </div>
-                        </td>
-                        <td style={{ padding: "13px 20px", fontSize: 13, color: "#5a8aaa" }}>{p.email || "—"}</td>
-                        <td style={{ padding: "13px 20px", fontSize: 13, color: "#5a8aaa" }}>{p.territory || "—"}</td>
-                        <td style={{ padding: "13px 20px", fontSize: 13, color: "#5a8aaa" }}>
-                          {p.commission_rate != null ? `${p.commission_rate}%` : "—"}
-                        </td>
-                        <td style={{ padding: "13px 20px" }}>
-                          <StagePill stage={p.stage || "Identified"} />
-                        </td>
-                      </tr>
-                    ))}
+                              {isPaid ? "Paid" : "Pending"}
+                            </span>
+                          </td>
+                          <td style={{ padding: "13px 20px", fontSize: 12, color: "#4a7090" }}>
+                            {c.created_at ? new Date(c.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "—"}
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
-              )}
-            </Card>
+              </Card>
+            )}
           </div>
         )}
 

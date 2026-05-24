@@ -11,13 +11,36 @@ const DEFAULT_CHECKLIST = [
 
 const emptyLead = { business_name: "", owner_name: "", phone: "", country: "", notes: "" };
 
-const TABS = [
+const BASE_TABS = [
   { id: "home", label: "Home" },
   { id: "profile", label: "My Profile" },
   { id: "training", label: "Training" },
   { id: "materials", label: "Materials" },
   { id: "leads", label: "Submit Lead" },
 ];
+
+const STAGE_COLORS = {
+  Identified: "#5ab0f0",
+  Contacted:  "#5aaae0",
+  Interested: "#35c080",
+  Evaluating: "#f0c040",
+  Onboarding: "#c080f0",
+  Active:     "#35c060",
+  Stalled:    "#e0a030",
+  Declined:   "#f07070",
+};
+
+const StagePill = ({ stage }) => {
+  const color = STAGE_COLORS[stage] || STAGE_COLORS.Identified;
+  return (
+    <span style={{
+      fontSize: 11, fontWeight: 700, color,
+      background: `${color}18`,
+      border: `1px solid ${color}33`,
+      padding: "2px 9px", borderRadius: 20,
+    }}>{stage || "Identified"}</span>
+  );
+};
 
 const Card = ({ children, style = {} }) => (
   <div style={{
@@ -63,6 +86,7 @@ const inputStyle = {
 export default function PartnerPortal({ profile, onLogout }) {
   const [tab, setTab] = useState("home");
   const [checklist, setChecklist] = useState([]);
+  const [promotors, setPromotors] = useState([]);
   const [materials, setMaterials] = useState([]);
   const [training, setTraining] = useState([]);
   const [lead, setLead] = useState(emptyLead);
@@ -95,13 +119,15 @@ export default function PartnerPortal({ profile, onLogout }) {
       setChecklist(checkData);
     }
 
-    const [{ data: matData }, { data: trainData }] = await Promise.all([
+    const [{ data: matData }, { data: trainData }, { data: promotorData }] = await Promise.all([
       supabase.from("outreach_materials").select("*").order("created_at", { ascending: false }),
       supabase.from("training_materials").select("*").order("created_at", { ascending: false }),
+      supabase.from("partners").select("*").eq("parent_partner_id", partnerId),
     ]);
 
     setMaterials(matData || []);
     setTraining(trainData || []);
+    setPromotors(promotorData || []);
     setLoading(false);
   };
 
@@ -197,7 +223,10 @@ export default function PartnerPortal({ profile, onLogout }) {
 
         {/* Tabs */}
         <div style={{ display: "flex", gap: 2, marginBottom: 22, background: "rgba(4,10,24,0.85)", borderRadius: 10, padding: 3, width: "fit-content", flexWrap: "wrap" }}>
-          {TABS.map(t => (
+          {[
+            ...BASE_TABS,
+            ...(promotors.length > 0 ? [{ id: "my-promotors", label: "My Promotors" }] : []),
+          ].map(t => (
             <button key={t.id} onClick={() => setTab(t.id)} style={{
               padding: "7px 15px", borderRadius: 8, border: "none", cursor: "pointer",
               background: tab === t.id ? "rgba(80,140,210,0.22)" : "transparent",
@@ -212,6 +241,21 @@ export default function PartnerPortal({ profile, onLogout }) {
         {/* HOME */}
         {tab === "home" && (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 16 }}>
+            {promotors.length > 0 && (
+              <Card style={{ gridColumn: "1 / -1", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "18px 24px", background: "rgba(80,140,210,0.08)", border: "1px solid rgba(80,140,210,0.2)" }}>
+                <div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: "#4a7090", letterSpacing: "0.12em", marginBottom: 6 }}>MY PROMOTORS</div>
+                  <div style={{ fontSize: 28, fontWeight: 800, color: "#5ab0f0", lineHeight: 1 }}>{promotors.length}</div>
+                  <div style={{ fontSize: 12, color: "#3a5a70", marginTop: 4 }}>sub-partner{promotors.length !== 1 ? "s" : ""} under you</div>
+                </div>
+                <button
+                  onClick={() => setTab("my-promotors")}
+                  style={{ fontSize: 13, color: "#5ab0f0", background: "rgba(80,160,230,0.1)", border: "1px solid rgba(80,160,230,0.22)", borderRadius: 8, padding: "7px 14px", cursor: "pointer", fontWeight: 600 }}
+                >
+                  View team →
+                </button>
+              </Card>
+            )}
             <Card>
               <SectionLabel>ONBOARDING CHECKLIST</SectionLabel>
               {checklist.map(c => (
@@ -314,6 +358,68 @@ export default function PartnerPortal({ profile, onLogout }) {
                 </a>
               </Card>
             ))}
+          </div>
+        )}
+
+        {/* MY PROMOTORS */}
+        {tab === "my-promotors" && (
+          <div>
+            <div style={{ marginBottom: 18 }}>
+              <h2 style={{ fontSize: 18, fontWeight: 700, color: "#ffffff", margin: 0 }}>My Promotors</h2>
+              <p style={{ fontSize: 13, color: "#4a7090", margin: "4px 0 0" }}>
+                {promotors.length} sub-partner{promotors.length !== 1 ? "s" : ""} reporting to you
+              </p>
+            </div>
+            <Card style={{ padding: 0, overflow: "hidden" }}>
+              {promotors.length === 0 ? (
+                <div style={{ padding: "40px 0", textAlign: "center", color: "#3a5a70", fontSize: 14 }}>
+                  No promotors assigned to you yet.
+                </div>
+              ) : (
+                <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                  <thead>
+                    <tr style={{ borderBottom: "1px solid rgba(50,80,140,0.25)" }}>
+                      {["Name", "Email", "Territory", "Commission", "Stage"].map(h => (
+                        <th key={h} style={{ padding: "12px 20px", textAlign: "left", fontSize: 11, color: "#4a7090", fontWeight: 700, letterSpacing: "0.1em" }}>
+                          {h.toUpperCase()}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {promotors.map((p, i) => (
+                      <tr key={p.id}
+                        style={{ borderBottom: i < promotors.length - 1 ? "1px solid rgba(50,80,140,0.15)" : "none", transition: "background 0.1s" }}
+                        onMouseEnter={e => e.currentTarget.style.background = "rgba(80,140,210,0.05)"}
+                        onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+                        <td style={{ padding: "13px 20px" }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                            <div style={{
+                              width: 30, height: 30, borderRadius: "50%",
+                              background: "linear-gradient(135deg, #1a3a6a, #0d2045)",
+                              border: "1.5px solid rgba(80,140,200,0.3)",
+                              display: "flex", alignItems: "center", justifyContent: "center",
+                              fontSize: 11, fontWeight: 700, color: "#5ab0f0", flexShrink: 0,
+                            }}>
+                              {(p.full_name || "?").split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase()}
+                            </div>
+                            <span style={{ fontSize: 14, fontWeight: 600, color: "#c0d8e8" }}>{p.full_name || "—"}</span>
+                          </div>
+                        </td>
+                        <td style={{ padding: "13px 20px", fontSize: 13, color: "#5a8aaa" }}>{p.email || "—"}</td>
+                        <td style={{ padding: "13px 20px", fontSize: 13, color: "#5a8aaa" }}>{p.territory || "—"}</td>
+                        <td style={{ padding: "13px 20px", fontSize: 13, color: "#5a8aaa" }}>
+                          {p.commission_rate != null ? `${p.commission_rate}%` : "—"}
+                        </td>
+                        <td style={{ padding: "13px 20px" }}>
+                          <StagePill stage={p.stage || "Identified"} />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </Card>
           </div>
         )}
 

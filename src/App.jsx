@@ -21,9 +21,14 @@ export default function App() {
     if (params.partnerId) setSelectedPartnerId(params.partnerId);
   };
 
-  const login = (userRole, userProfile) => {
+  const login = async (userRole, user) => {
     setRole(userRole);
-    setProfile(userProfile);
+    const { data: profileData } = await supabase
+      .from("profiles")
+      .select("*")
+      .eq("id", user.id)
+      .single();
+    setProfile({ ...profileData, email: user.email });
     setPage(userRole === "admin" ? "dashboard" : "partner-portal");
   };
 

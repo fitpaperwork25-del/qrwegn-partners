@@ -58,7 +58,7 @@ export default function LoginPage({ onLogin }) {
     }
 
     setLoading(false);
-    onLogin(userRole, user.user_metadata || {});
+    onLogin(userRole, user);
   };
 
   return (

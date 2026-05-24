@@ -101,56 +101,78 @@ export default function PartnerPortal({ profile, onLogout }) {
   useEffect(() => { init(); }, []);
 
   const init = async () => {
-    // Use profile.id from prop; fall back to live session if not available
-    let partnerId = profile?.id;
-    if (!partnerId) {
-      const { data: { user } } = await supabase.auth.getUser();
-      partnerId = user?.id;
-    }
-    if (!partnerId) return;
+    // Wrap a Supabase query with a 5-second timeout; returns null on failure
+    const safe = (queryPromise) => {
+      const timeout = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error("Query timed out")), 5000)
+      );
+      return Promise.race([queryPromise, timeout]).catch(err => {
+        console.warn("Supabase fetch failed/timed out:", err.message);
+        return { data: null, error: err };
+      });
+    };
 
-    const { data: checkData } = await supabase
-      .from("partner_checklist")
-      .select("*")
-      .eq("partner_id", partnerId)
-      .order("sort_order");
-
-    if (!checkData || checkData.length === 0) {
-      const rows = DEFAULT_CHECKLIST.map(item => ({ partner_id: partnerId, ...item, done: false }));
-      const { data: inserted } = await supabase.from("partner_checklist").insert(rows).select();
-      setChecklist(inserted || rows);
-    } else {
-      setChecklist(checkData);
-    }
-
-    const [{ data: matData }, { data: trainData }, { data: promotorData }] = await Promise.all([
-      supabase.from("outreach_materials").select("*").order("created_at", { ascending: false }),
-      supabase.from("training_materials").select("*").order("created_at", { ascending: false }),
-      supabase.from("partners").select("*").eq("parent_partner_id", partnerId),
-    ]);
-
-    setMaterials(matData || []);
-    setTraining(trainData || []);
-    setPromotors(promotorData || []);
-
-    // Commissions — graceful fallback if table doesn't exist yet
     try {
-      const { data: commData, error: commErr } = await supabase
-        .from("commissions")
-        .select("*")
-        .eq("partner_id", partnerId)
-        .order("created_at", { ascending: false });
-      if (commErr) {
-        console.warn("Commissions table unavailable:", commErr.message);
-        setCommissionsUnavailable(true);
-      } else {
-        setCommissions(commData || []);
+      // Resolve partner ID
+      let partnerId = profile?.id;
+      if (!partnerId) {
+        const res = await safe(supabase.auth.getUser());
+        partnerId = res?.data?.user?.id;
       }
-    } catch {
-      setCommissionsUnavailable(true);
-    }
+      if (!partnerId) {
+        console.warn("init: no partnerId, aborting");
+        return;
+      }
 
-    setLoading(false);
+      // Checklist
+      try {
+        const { data: checkData } = await safe(
+          supabase.from("partner_checklist").select("*").eq("partner_id", partnerId).order("sort_order")
+        );
+        if (!checkData || checkData.length === 0) {
+          const rows = DEFAULT_CHECKLIST.map(item => ({ partner_id: partnerId, ...item, done: false }));
+          const { data: inserted } = await safe(
+            supabase.from("partner_checklist").insert(rows).select()
+          );
+          setChecklist(inserted || rows);
+        } else {
+          setChecklist(checkData);
+        }
+      } catch (e) {
+        console.warn("Checklist fetch failed:", e.message);
+        setChecklist(DEFAULT_CHECKLIST.map(item => ({ ...item, done: false })));
+      }
+
+      // Materials, training, promotors — all in parallel, each independently safe
+      const [matRes, trainRes, promotorRes] = await Promise.all([
+        safe(supabase.from("outreach_materials").select("*").order("created_at", { ascending: false })),
+        safe(supabase.from("training_materials").select("*").order("created_at", { ascending: false })),
+        safe(supabase.from("partners").select("*").eq("parent_partner_id", partnerId)),
+      ]);
+      setMaterials(matRes?.data || []);
+      setTraining(trainRes?.data || []);
+      setPromotors(promotorRes?.data || []);
+
+      // Commissions — table may not exist yet
+      try {
+        const { data: commData, error: commErr } = await safe(
+          supabase.from("commissions").select("*").eq("partner_id", partnerId).order("created_at", { ascending: false })
+        );
+        if (commErr) {
+          console.warn("Commissions unavailable:", commErr.message);
+          setCommissionsUnavailable(true);
+        } else {
+          setCommissions(commData || []);
+        }
+      } catch {
+        setCommissionsUnavailable(true);
+      }
+
+    } catch (err) {
+      console.error("init() unexpected error:", err.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const toggleCheck = async (item) => {

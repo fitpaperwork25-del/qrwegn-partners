@@ -6,156 +6,308 @@ export default function LoginPage({ onLogin }) {
   const [password, setPassword] = useState("");
   const [mode, setMode] = useState("admin");
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [resetSent, setResetSent] = useState(false);
+  const [errorText, setErrorText] = useState("");
 
   const handleLogin = async () => {
-    if (!email.trim() || !password.trim()) {
-      setError("Please enter your email and password.");
-      return;
-    }
     setLoading(true);
-    setError("");
+    setErrorText("");
 
-    const { data, error: loginError } = await supabase.auth.signInWithPassword({
+    console.log("LOGIN ATTEMPT:", {
       email,
+      mode,
+      passwordLength: password.length,
+    });
+
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: email.trim(),
       password,
     });
 
-    if (loginError) {
+    if (error) {
+      console.log("SUPABASE LOGIN ERROR:", error);
+      setErrorText(error.message);
+      alert(error.message);
       setLoading(false);
-      setError(loginError.message);
       return;
     }
 
-    const userId = data.user.id;
+    console.log("SUPABASE LOGIN SUCCESS:", data);
 
-    const { data: profile, error: profileError } = await supabase
-      .from("profiles")
-      .select("role, partner_id, full_name")
-      .eq("id", userId)
-      .single();
+    const user = data?.user;
 
-    if (profileError || !profile) {
+    if (!user) {
+      setErrorText("Login succeeded but no user returned.");
       setLoading(false);
-      setError("Login succeeded, but no profile was found.");
       return;
     }
 
-    if (profile.role !== mode) {
+    const userRole = user.user_metadata?.role || mode;
+
+    if (mode === "partner" && userRole !== "partner") {
+      setErrorText("This account is not marked as a partner.");
+      await supabase.auth.signOut();
       setLoading(false);
-      setError(`This account is registered as ${profile.role}, not ${mode}.`);
+      return;
+    }
+
+    if (mode === "admin" && userRole === "partner") {
+      setErrorText("Partner accounts must use the Partner login tab.");
+      await supabase.auth.signOut();
+      setLoading(false);
       return;
     }
 
     setLoading(false);
-    onLogin(profile.role, profile);
-  };
-
-  const handleForgotPassword = async () => {
-    if (!email) { setError("Enter your email first."); return; }
-    const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: "https://qrwegn-partners.vercel.app",
-    });
-    if (resetError) { setError(resetError.message); return; }
-    setResetSent(true);
-    setError("");
+    onLogin(userRole, user.user_metadata || {});
   };
 
   return (
-    <div style={{
-      minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center",
-      background: "linear-gradient(160deg, #050d1a 0%, #0a1525 25%, #0d1a30 50%, #081020 75%, #060e1c 100%)",
-      position: "relative", overflow: "hidden"
-    }}>
-      <div style={{ position: "absolute", top: -100, right: -100, width: 500, height: 500, borderRadius: "50%", background: "rgba(30,60,120,0.2)", pointerEvents: "none" }} />
-      <div style={{ position: "absolute", bottom: -80, left: -80, width: 400, height: 400, borderRadius: "50%", background: "rgba(20,50,100,0.15)", pointerEvents: "none" }} />
-      <div style={{ position: "absolute", top: "30%", left: "10%", width: 200, height: 200, borderRadius: "50%", background: "rgba(20,50,100,0.2)", pointerEvents: "none" }} />
+    <div
+      style={{
+        minHeight: "100vh",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        background:
+          "linear-gradient(160deg, #071426 0%, #0a1830 45%, #0d1f3d 100%)",
+        position: "relative",
+        overflow: "hidden",
+      }}
+    >
+      <div
+        style={{
+          position: "absolute",
+          top: -100,
+          right: -100,
+          width: 500,
+          height: 500,
+          borderRadius: "50%",
+          background: "rgba(40,90,150,0.22)",
+          pointerEvents: "none",
+        }}
+      />
 
-      <div style={{
-        background: "rgba(10,20,45,0.95)", backdropFilter: "blur(24px)",
-        borderRadius: 20, padding: "48px 44px", width: 400,
-        boxShadow: "0 8px 48px rgba(90,160,255,0.15), 0 0 0 1px rgba(90,160,255,0.1)",
-        border: "1px solid rgba(90,160,255,0.15)", position: "relative", zIndex: 10
-      }}>
+      <div
+        style={{
+          position: "absolute",
+          bottom: -100,
+          left: -100,
+          width: 420,
+          height: 420,
+          borderRadius: "50%",
+          background: "rgba(35,80,135,0.18)",
+          pointerEvents: "none",
+        }}
+      />
+
+      <div
+        style={{
+          background: "rgba(10,20,45,0.88)",
+          backdropFilter: "blur(24px)",
+          borderRadius: 22,
+          padding: "48px 44px",
+          width: 400,
+          boxShadow:
+            "0 12px 60px rgba(0,0,0,0.35), 0 0 0 1px rgba(90,160,230,0.18)",
+          border: "1px solid rgba(90,160,230,0.2)",
+          position: "relative",
+          zIndex: 10,
+        }}
+      >
         <div style={{ textAlign: "center", marginBottom: 32 }}>
-          <img src="/Logo.png" alt="QR-Wegn" style={{ width: 180, display: "block", margin: "0 auto 16px", filter: "brightness(1.1)" }} />
-          <p style={{ fontSize: 16, color: "rgba(150,200,255,0.5)", margin: 0, letterSpacing: "0.08em", textTransform: "uppercase", fontWeight: 500 }}>
-            Partner Network Portal
+          <img
+            src="/Logo.png"
+            alt="QR-Wegn"
+            style={{
+              width: 180,
+              display: "block",
+              margin: "0 auto 18px",
+              background: "white",
+            }}
+          />
+
+          <p
+            style={{
+              fontSize: 15,
+              color: "#7aaac8",
+              margin: 0,
+              letterSpacing: "0.08em",
+              fontWeight: 600,
+            }}
+          >
+            PARTNER NETWORK PORTAL
           </p>
         </div>
 
-        <div style={{
-          display: "flex", background: "rgba(90,160,255,0.06)", borderRadius: 10,
-          padding: 4, marginBottom: 24, gap: 4,
-          border: "1px solid rgba(90,160,255,0.12)"
-        }}>
-          {["admin", "partner"].map(m => (
-            <button key={m} onClick={() => setMode(m)} style={{
-              flex: 1, padding: "9px 0", borderRadius: 8, border: "none", cursor: "pointer",
-              background: mode === m ? "rgba(90,176,240,0.18)" : "transparent",
-              color: mode === m ? "#7dc4ff" : "rgba(150,200,255,0.4)",
-              fontSize: 15, fontWeight: mode === m ? 600 : 400,
-              boxShadow: mode === m ? "inset 0 0 0 1px rgba(90,160,255,0.3)" : "none",
-              transition: "all 0.15s", textTransform: "capitalize", letterSpacing: "0.02em"
-            }}>{m === "admin" ? "Admin" : "Partner"}</button>
+        <div
+          style={{
+            display: "flex",
+            background: "rgba(100,160,220,0.08)",
+            borderRadius: 12,
+            padding: 4,
+            marginBottom: 24,
+            gap: 4,
+            border: "1px solid rgba(100,160,220,0.18)",
+          }}
+        >
+          {["admin", "partner"].map((m) => (
+            <button
+              key={m}
+              onClick={() => {
+                setMode(m);
+                setErrorText("");
+              }}
+              style={{
+                flex: 1,
+                padding: "10px 0",
+                borderRadius: 9,
+                border: "none",
+                cursor: "pointer",
+                background:
+                  mode === m ? "rgba(90,160,230,0.25)" : "transparent",
+                color: mode === m ? "#8fd0ff" : "#6f95b8",
+                fontSize: 14,
+                fontWeight: mode === m ? 700 : 500,
+                boxShadow:
+                  mode === m
+                    ? "inset 0 0 0 1px rgba(120,190,255,0.25)"
+                    : "none",
+                textTransform: "capitalize",
+              }}
+            >
+              {m === "admin" ? "Admin" : "Partner"}
+            </button>
           ))}
         </div>
 
         <div style={{ marginBottom: 16 }}>
-          <label style={{ fontSize: 12, color: "rgba(150,200,255,0.6)", display: "block", marginBottom: 6, fontWeight: 600, letterSpacing: "0.1em" }}>EMAIL</label>
-          <input value={email} onChange={e => setEmail(e.target.value)}
-            placeholder={mode === "admin" ? "info@qrwegn.com" : "partner@email.com"}
+          <label
             style={{
-              width: "100%", padding: "12px 14px", borderRadius: 10, fontSize: 15,
-              border: "1.5px solid rgba(90,160,255,0.2)", background: "rgba(5,12,30,0.8)",
-              color: "#ffffff", outline: "none", boxSizing: "border-box",
-              transition: "border-color 0.15s"
-            }} />
+              fontSize: 12,
+              color: "#7aaac8",
+              display: "block",
+              marginBottom: 6,
+              fontWeight: 600,
+              letterSpacing: "0.06em",
+            }}
+          >
+            EMAIL
+          </label>
+
+          <input
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder={
+              mode === "admin" ? "admin@qrwegn.com" : "partner@email.com"
+            }
+            style={{
+              width: "100%",
+              padding: "13px 14px",
+              borderRadius: 10,
+              fontSize: 15,
+              border: "1.5px solid rgba(100,160,220,0.28)",
+              background: "rgba(4,12,28,0.9)",
+              color: "#ffffff",
+              outline: "none",
+              boxSizing: "border-box",
+            }}
+          />
         </div>
 
-        <div style={{ marginBottom: 8 }}>
-          <label style={{ fontSize: 12, color: "rgba(150,200,255,0.6)", display: "block", marginBottom: 6, fontWeight: 600, letterSpacing: "0.1em" }}>PASSWORD</label>
-          <input type="password" value={password} onChange={e => setPassword(e.target.value)}
+        <div style={{ marginBottom: 12 }}>
+          <label
+            style={{
+              fontSize: 12,
+              color: "#7aaac8",
+              display: "block",
+              marginBottom: 6,
+              fontWeight: 600,
+              letterSpacing: "0.06em",
+            }}
+          >
+            PASSWORD
+          </label>
+
+          <input
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
             placeholder="••••••••"
             style={{
-              width: "100%", padding: "12px 14px", borderRadius: 10, fontSize: 15,
-              border: "1.5px solid rgba(90,160,255,0.2)", background: "rgba(5,12,30,0.8)",
-              color: "#ffffff", outline: "none", boxSizing: "border-box"
-            }} />
+              width: "100%",
+              padding: "13px 14px",
+              borderRadius: 10,
+              fontSize: 15,
+              border: "1.5px solid rgba(100,160,220,0.28)",
+              background: "rgba(4,12,28,0.9)",
+              color: "#ffffff",
+              outline: "none",
+              boxSizing: "border-box",
+            }}
+          />
         </div>
 
-        <div style={{ textAlign: "right", marginBottom: 20 }}>
-          <button onClick={handleForgotPassword} style={{
-            background: "none", border: "none", cursor: "pointer",
-            color: "rgba(150,200,255,0.5)", fontSize: 13, padding: 0, textDecoration: "underline"
-          }}>Forgot password?</button>
+        <div style={{ textAlign: "right", marginBottom: 18 }}>
+          <button
+            type="button"
+            onClick={() => alert("Use Supabase password recovery for now.")}
+            style={{
+              background: "none",
+              border: "none",
+              color: "#7aaac8",
+              fontSize: 13,
+              cursor: "pointer",
+              textDecoration: "underline",
+            }}
+          >
+            Forgot password?
+          </button>
         </div>
 
-        {resetSent && (
-          <p style={{ color: "#5ab0f0", fontSize: 14, marginBottom: 16 }}>
-            Password reset email sent. Check your inbox.
-          </p>
+        {errorText && (
+          <div
+            style={{
+              color: "#ff6b6b",
+              fontSize: 14,
+              marginBottom: 16,
+            }}
+          >
+            {errorText}
+          </div>
         )}
 
-        {error && (
-          <p style={{ color: "#ff6666", fontSize: 14, marginBottom: 16 }}>
-            {error}
-          </p>
-        )}
-
-        <button onClick={handleLogin} disabled={loading} style={{
-          width: "100%", padding: "13px 0", borderRadius: 10, border: "none",
-          background: loading ? "rgba(90,160,255,0.2)" : "linear-gradient(135deg, #3a9ad9, #2a7ab8)",
-          color: "white", fontSize: 16, fontWeight: 600, cursor: loading ? "default" : "pointer",
-          boxShadow: loading ? "none" : "0 4px 20px rgba(90,160,255,0.3)", transition: "all 0.2s",
-          letterSpacing: "0.02em"
-        }}>
+        <button
+          onClick={handleLogin}
+          disabled={loading || !email.trim() || !password}
+          style={{
+            width: "100%",
+            padding: "14px 0",
+            borderRadius: 10,
+            border: "none",
+            background:
+              loading || !email.trim() || !password
+                ? "rgba(100,160,220,0.35)"
+                : "linear-gradient(135deg, #3a9ad9, #2a7ab8)",
+            color: "white",
+            fontSize: 16,
+            fontWeight: 700,
+            cursor: loading || !email.trim() || !password ? "default" : "pointer",
+            boxShadow: "0 6px 20px rgba(42,122,184,0.35)",
+          }}
+        >
           {loading ? "Signing in..." : "Sign In"}
         </button>
 
-        <p style={{ textAlign: "center", fontSize: 13, color: "rgba(150,200,255,0.3)", marginTop: 24, marginBottom: 0, letterSpacing: "0.04em" }}>
-          QR-Wegn &middot; ወግን &middot; Partner Network
+        <p
+          style={{
+            textAlign: "center",
+            fontSize: 12,
+            color: "#6f95b8",
+            marginTop: 22,
+            marginBottom: 0,
+          }}
+        >
+          QR-Wegn · ወግን · Partner Network
         </p>
       </div>
     </div>

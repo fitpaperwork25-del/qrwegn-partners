@@ -1,96 +1,207 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabase";
 
-const EMPTY_FORM = { title: "", description: "", type: "pdf", file: null };
+const BUCKET = "partner-materials";
 
-function typeIcon(type) {
-  return type === "video" ? "🎥" : "📄";
-}
+const emptyForm = {
+  title: "",
+  description: "",
+  type: "pdf",
+  files: [],
+};
 
 export default function MaterialsPage() {
   const [materials, setMaterials] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [form, setForm] = useState(emptyForm);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
 
-  const [showAdd, setShowAdd] = useState(false);
-  const [editTarget, setEditTarget] = useState(null); // material object or null
+  useEffect(() => {
+    loadMaterials();
+  }, []);
 
   const loadMaterials = async () => {
     setLoading(true);
+
     const { data, error } = await supabase
       .from("outreach_materials")
       .select("*")
-      .order("title");
-    console.log("outreach_materials:", data, error);
-    if (!error && data) setMaterials(data);
+      .order("created_at", { ascending: false });
+
+    if (!error && data) {
+      setMaterials(data);
+    }
+
     setLoading(false);
   };
 
-  useEffect(() => { loadMaterials(); }, []);
+  const set = (key, val) => {
+    setForm((f) => ({ ...f, [key]: val }));
+  };
 
-  const handleDelete = async (material) => {
-    if (!window.confirm(`Delete "${material.title}"?`)) return;
-    await supabase.from("outreach_materials").delete().eq("id", material.id);
+  const openAdd = () => {
+    setForm(emptyForm);
+    setError("");
+    setModalOpen(true);
+  };
+
+  const closeModal = () => {
+    if (saving) return;
+    setModalOpen(false);
+    setError("");
+  };
+
+  const getFileBaseName = (fileName) => {
+    return fileName
+      .replace(/\.[^/.]+$/, "")
+      .replace(/[-_]/g, " ");
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
+    if (!form.title.trim()) {
+      setError("Title is required.");
+      return;
+    }
+
+    if (!form.files || form.files.length === 0) {
+      setError("Please select at least one file.");
+      return;
+    }
+
+    setSaving(true);
+    setError("");
+
+    for (const file of form.files) {
+      const safeName = file.name.replace(/[^a-zA-Z0-9.-]/g, "-");
+
+      const path = `${Date.now()}-${Math.random()
+        .toString(36)
+        .slice(2)}-${safeName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from(BUCKET)
+        .upload(path, file, { upsert: false });
+
+      if (uploadError) {
+        setError("File upload failed: " + uploadError.message);
+        setSaving(false);
+        return;
+      }
+
+      const { data: urlData } = supabase.storage
+        .from(BUCKET)
+        .getPublicUrl(path);
+
+      const finalTitle =
+        form.files.length === 1
+          ? form.title.trim()
+          : `${form.title.trim()} - ${getFileBaseName(file.name)}`;
+
+      const { error: insertError } = await supabase
+        .from("outreach_materials")
+        .insert({
+          title: finalTitle,
+          description: form.description.trim(),
+          type: form.type,
+          file_url: urlData.publicUrl,
+        });
+
+      if (insertError) {
+        setError("Database insert failed: " + insertError.message);
+        setSaving(false);
+        return;
+      }
+    }
+
+    setSaving(false);
+    setModalOpen(false);
+    setForm(emptyForm);
+
     loadMaterials();
   };
 
+  const handleDelete = async (id, title) => {
+    if (!window.confirm(`Delete "${title}"?`)) return;
+
+    const { error } = await supabase
+      .from("outreach_materials")
+      .delete()
+      .eq("id", id);
+
+    if (error) {
+      alert("Delete failed: " + error.message);
+      return;
+    }
+
+    loadMaterials();
+  };
+
+  const typeIcon = (type) => {
+    if (type === "video") return "🎥";
+    if (type === "doc") return "📝";
+    return "📄";
+  };
+
   if (loading) {
-    return <div className="p-8 text-white">Loading materials...</div>;
+    return <div style={s.page}>Loading materials...</div>;
   }
 
   return (
-    <div className="p-8">
-      <div className="flex items-center justify-between mb-8">
+    <div style={s.page}>
+      <div style={s.header}>
         <div>
-          <h1 className="text-4xl font-bold text-white">Outreach Materials</h1>
-          <p className="text-slate-400 mt-2">Sales and deployment assets for partners</p>
+          <h1 style={s.title}>Outreach Materials</h1>
+
+          <p style={s.subtitle}>
+            Sales and deployment assets for partners
+          </p>
         </div>
-        <button
-          onClick={() => setShowAdd(true)}
-          className="bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-xl font-semibold"
-        >
+
+        <button style={s.addButton} onClick={openAdd}>
           + Add Material
         </button>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {materials.map((material) => (
-          <div
-            key={material.id}
-            className="bg-[#0B1739] border border-slate-800 rounded-3xl p-6 flex items-start justify-between"
-          >
-            <div className="flex gap-4">
-              <div className="w-14 h-14 rounded-2xl bg-slate-800 flex items-center justify-center text-2xl">
-                {typeIcon(material.type)}
+      <div style={s.grid}>
+        {materials.map((m) => (
+          <div key={m.id} style={s.card}>
+            <div style={s.left}>
+              <div style={s.icon}>
+                {typeIcon(m.type)}
               </div>
+
               <div>
-                <h3 className="text-2xl font-bold text-white">{material.title}</h3>
-                <p className="text-slate-400 mt-2 max-w-md">{material.description}</p>
-                <div className="mt-4">
-                  <span className="bg-slate-700 text-slate-200 text-sm px-3 py-1 rounded-full uppercase">
-                    {material.type}
-                  </span>
-                </div>
+                <h3 style={s.cardTitle}>
+                  {m.title}
+                </h3>
+
+                <p style={s.description}>
+                  {m.description}
+                </p>
+
+                <span style={s.badge}>
+                  {(m.type || "file").toUpperCase()}
+                </span>
               </div>
             </div>
 
-            <div className="flex flex-col gap-3 ml-4 shrink-0">
+            <div style={s.actions}>
               <a
-                href={material.file_url}
+                href={m.file_url}
                 target="_blank"
                 rel="noreferrer"
-                className="bg-blue-500 hover:bg-blue-600 text-white px-5 py-2 rounded-xl text-center font-medium"
+                style={s.downloadButton}
               >
                 Download
               </a>
+
               <button
-                onClick={() => setEditTarget(material)}
-                className="text-slate-400 hover:text-white text-center"
-              >
-                Edit
-              </button>
-              <button
-                onClick={() => handleDelete(material)}
-                className="text-red-400 hover:text-red-300 text-center"
+                style={s.deleteButton}
+                onClick={() => handleDelete(m.id, m.title)}
               >
                 Delete
               </button>
@@ -100,173 +211,382 @@ export default function MaterialsPage() {
       </div>
 
       {materials.length === 0 && (
-        <div className="text-center text-slate-400 mt-20">No outreach materials found.</div>
+        <div style={s.empty}>
+          No outreach materials found.
+        </div>
       )}
 
-      {showAdd && (
-        <MaterialModal
-          onClose={() => setShowAdd(false)}
-          onSaved={() => { setShowAdd(false); loadMaterials(); }}
-        />
-      )}
+      {modalOpen && (
+        <div style={s.overlay} onClick={closeModal}>
+          <div
+            style={s.modal}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 style={s.modalTitle}>
+              Add Material
+            </h2>
 
-      {editTarget && (
-        <MaterialModal
-          initial={editTarget}
-          onClose={() => setEditTarget(null)}
-          onSaved={() => { setEditTarget(null); loadMaterials(); }}
-        />
+            <form onSubmit={handleSubmit} style={s.form}>
+              <div style={s.field}>
+                <label style={s.label}>
+                  Title
+                </label>
+
+                <input
+                  type="text"
+                  value={form.title}
+                  onChange={(e) =>
+                    set("title", e.target.value)
+                  }
+                  placeholder="e.g. South Sudan Outreach Kit"
+                  style={s.input}
+                />
+              </div>
+
+              <div style={s.field}>
+                <label style={s.label}>
+                  Description
+                </label>
+
+                <textarea
+                  value={form.description}
+                  onChange={(e) =>
+                    set("description", e.target.value)
+                  }
+                  placeholder="Brief description of this material"
+                  rows={3}
+                  style={{
+                    ...s.input,
+                    resize: "none",
+                  }}
+                />
+              </div>
+
+              <div style={s.field}>
+                <label style={s.label}>
+                  Type
+                </label>
+
+                <select
+                  value={form.type}
+                  onChange={(e) =>
+                    set("type", e.target.value)
+                  }
+                  style={s.input}
+                >
+                  <option value="pdf">
+                    PDF
+                  </option>
+
+                  <option value="video">
+                    Video
+                  </option>
+
+                  <option value="doc">
+                    Doc
+                  </option>
+                </select>
+              </div>
+
+              <div style={s.field}>
+                <label style={s.label}>
+                  Files
+                </label>
+
+                <input
+                  type="file"
+                  multiple
+                  onChange={(e) =>
+                    set(
+                      "files",
+                      Array.from(e.target.files || [])
+                    )
+                  }
+                  style={{ color: "#e2e8f0" }}
+                />
+
+                {form.files.length > 0 && (
+                  <p style={s.fileCount}>
+                    {form.files.length} file(s) selected
+                  </p>
+                )}
+              </div>
+
+              {error && (
+                <p style={s.errorText}>
+                  {error}
+                </p>
+              )}
+
+              <div style={s.modalButtons}>
+                <button
+                  type="submit"
+                  disabled={saving}
+                  style={s.submitButton}
+                >
+                  {saving
+                    ? "Uploading..."
+                    : "Add Material"}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={closeModal}
+                  disabled={saving}
+                  style={s.cancelButton}
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
       )}
     </div>
   );
 }
 
-function MaterialModal({ initial = null, onClose, onSaved }) {
-  const isEdit = Boolean(initial);
-  const [form, setForm] = useState(
-    initial
-      ? { title: initial.title, description: initial.description, type: initial.type, file: null }
-      : { ...EMPTY_FORM }
-  );
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
+const s = {
+  page: {
+    padding: "32px 40px",
+    minHeight: "100vh",
+    color: "#ffffff",
+  },
 
-  const set = (key, value) => setForm((f) => ({ ...f, [key]: value }));
+  header: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    marginBottom: "32px",
+    gap: "24px",
+  },
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setError("");
+  title: {
+    fontSize: "40px",
+    fontWeight: 800,
+    margin: 0,
+    color: "#ffffff",
+  },
 
-    if (!form.title.trim()) { setError("Title is required."); return; }
-    if (!isEdit && !form.file) { setError("Please select a file."); return; }
+  subtitle: {
+    marginTop: "8px",
+    color: "#9abccc",
+    fontSize: "18px",
+  },
 
-    setSaving(true);
+  addButton: {
+    background: "#2a7ab8",
+    color: "#ffffff",
+    padding: "14px 32px",
+    borderRadius: "14px",
+    fontWeight: 700,
+    fontSize: "16px",
+    cursor: "pointer",
+    border: "none",
+    boxShadow: "0 10px 24px rgba(42,122,184,0.35)",
+    whiteSpace: "nowrap",
+  },
 
-    let file_url = isEdit ? initial.file_url : null;
+  grid: {
+    display: "grid",
+    gridTemplateColumns:
+      "repeat(auto-fit, minmax(520px, 1fr))",
+    gap: "24px",
+  },
 
-    if (form.file) {
-      const ext = form.file.name.split(".").pop();
-      const path = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
-      const { error: uploadError } = await supabase.storage
-        .from("partner-materials")
-        .upload(path, form.file, { upsert: false });
+  card: {
+    background: "#0B1739",
+    border:
+      "1px solid rgba(154,188,204,0.18)",
+    borderRadius: "24px",
+    padding: "24px",
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    gap: "24px",
+    boxShadow:
+      "0 18px 35px rgba(0,0,0,0.25)",
+    maxWidth: "650px",
+  },
 
-      if (uploadError) {
-        setError(`Upload failed: ${uploadError.message}`);
-        setSaving(false);
-        return;
-      }
+  left: {
+    display: "flex",
+    gap: "18px",
+    alignItems: "flex-start",
+  },
 
-      const { data: urlData } = supabase.storage
-        .from("partner-materials")
-        .getPublicUrl(path);
-      file_url = urlData.publicUrl;
-    }
+  icon: {
+    width: "56px",
+    height: "56px",
+    borderRadius: "18px",
+    background: "#12264f",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    fontSize: "28px",
+    flexShrink: 0,
+  },
 
-    const payload = {
-      title: form.title.trim(),
-      description: form.description.trim(),
-      type: form.type,
-      file_url,
-    };
+  cardTitle: {
+    fontSize: "24px",
+    fontWeight: 800,
+    color: "#ffffff",
+    margin: 0,
+  },
 
-    let dbError;
-    if (isEdit) {
-      ({ error: dbError } = await supabase
-        .from("outreach_materials")
-        .update(payload)
-        .eq("id", initial.id));
-    } else {
-      ({ error: dbError } = await supabase
-        .from("outreach_materials")
-        .insert(payload));
-    }
+  description: {
+    color: "#9abccc",
+    marginTop: "10px",
+    maxWidth: "420px",
+    fontSize: "16px",
+    lineHeight: 1.5,
+  },
 
-    if (dbError) {
-      setError(`Save failed: ${dbError.message}`);
-      setSaving(false);
-      return;
-    }
+  badge: {
+    display: "inline-block",
+    marginTop: "14px",
+    background:
+      "rgba(122,170,200,0.18)",
+    color: "#7aaac8",
+    padding: "6px 12px",
+    borderRadius: "999px",
+    fontSize: "13px",
+    fontWeight: 800,
+    letterSpacing: "0.08em",
+  },
 
-    setSaving(false);
-    onSaved();
-  };
+  actions: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "12px",
+    alignItems: "flex-end",
+    flexShrink: 0,
+  },
 
-  return (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-      <div className="bg-[#0B1739] border border-slate-700 rounded-3xl p-8 w-full max-w-lg">
-        <h2 className="text-2xl font-bold text-white mb-6">
-          {isEdit ? "Edit Material" : "Add Material"}
-        </h2>
+  downloadButton: {
+    background: "#2a7ab8",
+    color: "#ffffff",
+    padding: "8px 16px",
+    borderRadius: "999px",
+    textDecoration: "none",
+    fontWeight: 700,
+    textAlign: "center",
+    whiteSpace: "nowrap",
+  },
 
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-          <div>
-            <label className="block text-slate-400 text-sm mb-1">Title</label>
-            <input
-              type="text"
-              value={form.title}
-              onChange={(e) => set("title", e.target.value)}
-              className="w-full bg-slate-800 text-white rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="e.g. Partner Sales Deck"
-            />
-          </div>
+  deleteButton: {
+    background: "transparent",
+    border: "none",
+    color: "#ff4d6d",
+    cursor: "pointer",
+    fontSize: "16px",
+  },
 
-          <div>
-            <label className="block text-slate-400 text-sm mb-1">Description</label>
-            <textarea
-              value={form.description}
-              onChange={(e) => set("description", e.target.value)}
-              rows={3}
-              className="w-full bg-slate-800 text-white rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-              placeholder="Brief description of this material"
-            />
-          </div>
+  empty: {
+    textAlign: "center",
+    color: "#9abccc",
+    marginTop: "80px",
+    fontSize: "18px",
+  },
 
-          <div>
-            <label className="block text-slate-400 text-sm mb-1">Type</label>
-            <select
-              value={form.type}
-              onChange={(e) => set("type", e.target.value)}
-              className="w-full bg-slate-800 text-white rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="pdf">PDF</option>
-              <option value="video">Video</option>
-              <option value="doc">Doc</option>
-            </select>
-          </div>
+  overlay: {
+    position: "fixed",
+    inset: 0,
+    background: "rgba(0,0,0,0.7)",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 1000,
+  },
 
-          <div>
-            <label className="block text-slate-400 text-sm mb-1">
-              File {isEdit && <span className="text-slate-500">(leave empty to keep existing)</span>}
-            </label>
-            <input
-              type="file"
-              onChange={(e) => set("file", e.target.files[0] || null)}
-              className="w-full text-slate-300 file:bg-slate-700 file:text-white file:border-0 file:rounded-lg file:px-4 file:py-2 file:mr-3 file:cursor-pointer"
-            />
-          </div>
+  modal: {
+    background: "#0B1739",
+    border:
+      "1px solid rgba(154,188,204,0.2)",
+    borderRadius: "24px",
+    padding: "36px",
+    width: "100%",
+    maxWidth: "480px",
+  },
 
-          {error && <p className="text-red-400 text-sm">{error}</p>}
+  modalTitle: {
+    fontSize: "24px",
+    fontWeight: 800,
+    color: "#ffffff",
+    marginBottom: "24px",
+    marginTop: 0,
+  },
 
-          <div className="flex gap-3 mt-2">
-            <button
-              type="submit"
-              disabled={saving}
-              className="flex-1 bg-blue-500 hover:bg-blue-600 disabled:opacity-50 text-white py-3 rounded-xl font-semibold"
-            >
-              {saving ? "Saving…" : isEdit ? "Save Changes" : "Add Material"}
-            </button>
-            <button
-              type="button"
-              onClick={onClose}
-              disabled={saving}
-              className="flex-1 bg-slate-700 hover:bg-slate-600 disabled:opacity-50 text-white py-3 rounded-xl font-semibold"
-            >
-              Cancel
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
-}
+  form: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "16px",
+  },
+
+  field: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "6px",
+  },
+
+  label: {
+    color: "#9abccc",
+    fontSize: "14px",
+    fontWeight: 600,
+  },
+
+  input: {
+    background: "#12264f",
+    border:
+      "1px solid rgba(154,188,204,0.2)",
+    borderRadius: "10px",
+    padding: "12px 16px",
+    color: "#ffffff",
+    fontSize: "15px",
+    outline: "none",
+    width: "100%",
+    boxSizing: "border-box",
+  },
+
+  fileCount: {
+    color: "#9abccc",
+    fontSize: "14px",
+    margin: 0,
+  },
+
+  errorText: {
+    color: "#ff4d6d",
+    fontSize: "14px",
+    margin: 0,
+  },
+
+  modalButtons: {
+    display: "flex",
+    gap: "12px",
+    marginTop: "8px",
+  },
+
+  submitButton: {
+    flex: 1,
+    background: "#2a7ab8",
+    color: "#ffffff",
+    border: "none",
+    borderRadius: "10px",
+    padding: "14px",
+    fontWeight: 700,
+    fontSize: "15px",
+    cursor: "pointer",
+  },
+
+  cancelButton: {
+    flex: 1,
+    background: "#1e3a5f",
+    color: "#ffffff",
+    border: "none",
+    borderRadius: "10px",
+    padding: "14px",
+    fontWeight: 700,
+    fontSize: "15px",
+    cursor: "pointer",
+  },
+};

@@ -12,67 +12,82 @@ export default function LoginPage({ onLogin }) {
     setLoading(true);
     setErrorText("");
 
-    console.log("LOGIN ATTEMPT:", {
-      email,
-      mode,
-      passwordLength: password.length,
-    });
-
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email: email.trim(),
-      password,
-    });
-
-    if (error) {
-      console.log("SUPABASE LOGIN ERROR:", error);
-      setErrorText(error.message);
-      alert(error.message);
+    // 5-second timeout: if any query hangs, unlock the button and warn the user
+    let timedOut = false;
+    const timeoutId = setTimeout(() => {
+      timedOut = true;
       setLoading(false);
-      return;
-    }
+      console.warn("LOGIN TIMEOUT: 5s exceeded — a database query is hanging");
+      alert("Login is taking too long. Check your internet connection and try again.");
+    }, 5000);
 
-    console.log("SUPABASE LOGIN SUCCESS:", data);
+    try {
+      console.log("LOGIN ATTEMPT:", { email, mode, passwordLength: password.length });
 
-    const user = data?.user;
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password,
+      });
 
-    if (!user) {
-      setErrorText("Login succeeded but no user returned.");
+      if (error) {
+        console.log("SUPABASE AUTH ERROR:", error);
+        setErrorText(error.message);
+        return;
+      }
+
+      console.log("SUPABASE AUTH SUCCESS, user id:", data?.user?.id);
+      const user = data?.user;
+
+      if (!user) {
+        setErrorText("Auth succeeded but no user was returned.");
+        return;
+      }
+
+      // Fetch profile — treat any failure as non-fatal, fall back to selected mode
+      console.log("FETCHING PROFILE from profiles table, id:", user.id);
+      let profileData = null;
+      try {
+        const { data: pd, error: pe } = await supabase
+          .from("profiles")
+          .select("*")
+          .eq("id", user.id)
+          .single();
+        console.log("PROFILE RESULT:", { data: pd, error: pe });
+        if (!pe) profileData = pd;
+        else console.warn("PROFILE QUERY ERROR (non-fatal):", pe.message);
+      } catch (profileErr) {
+        console.warn("PROFILE FETCH THREW (non-fatal):", profileErr);
+      }
+
+      // Role: authoritative from profile row, fallback to selected tab
+      const userRole = profileData?.role || mode;
+      console.log("RESOLVED ROLE:", userRole, "| has profile row:", !!profileData);
+
+      // Role mismatch guards
+      if (mode === "partner" && userRole !== "partner") {
+        setErrorText("This account is not a partner account.");
+        await supabase.auth.signOut();
+        return;
+      }
+      if (mode === "admin" && userRole === "partner") {
+        setErrorText("Partner accounts must use the Partner login tab.");
+        await supabase.auth.signOut();
+        return;
+      }
+
+      // Only navigate if the timeout hasn't already unlocked the page
+      if (!timedOut) {
+        console.log("NAVIGATING as:", userRole);
+        onLogin(userRole, { ...profileData, email: user.email, id: user.id });
+      }
+
+    } catch (err) {
+      console.error("LOGIN UNEXPECTED ERROR:", err);
+      setErrorText("An unexpected error occurred. Please try again.");
+    } finally {
+      clearTimeout(timeoutId);
       setLoading(false);
-      return;
     }
-
-    // Use profiles table as the authoritative role source
-    const { data: profileData, error: profileError } = await supabase
-      .from("profiles")
-      .select("*")
-      .eq("id", user.id)
-      .single();
-
-    if (profileError || !profileData) {
-      setErrorText("Could not load your profile. Contact your administrator.");
-      await supabase.auth.signOut();
-      setLoading(false);
-      return;
-    }
-
-    const userRole = profileData.role || mode;
-
-    if (mode === "partner" && userRole !== "partner") {
-      setErrorText("This account is not a partner account.");
-      await supabase.auth.signOut();
-      setLoading(false);
-      return;
-    }
-
-    if (mode === "admin" && userRole === "partner") {
-      setErrorText("Partner accounts must use the Partner login tab.");
-      await supabase.auth.signOut();
-      setLoading(false);
-      return;
-    }
-
-    setLoading(false);
-    onLogin(userRole, { ...profileData, email: user.email });
   };
 
   return (

@@ -68,8 +68,27 @@ export default function AdminDashboard({ navigate }) {
   return (
     <div>
       <div style={{ marginBottom: 28 }}>
-        <h1 style={{ fontSize: 30, fontWeight: 700, color: "#ffffff", margin: 0 }}>Partner Dashboard</h1>
-        <p style={{ fontSize: 20, color: "#a0c8e8", margin: "4px 0 0" }}>Overview of your partner pipeline and activity</p>
+        <h1
+          style={{
+            color: "#ffffff",
+            fontWeight: 700,
+            fontSize: "48px",
+            marginBottom: "10px",
+          }}
+        >
+          Partner Dashboard
+        </h1>
+
+        <p
+          style={{
+            color: "#ffffff",
+            opacity: 0.92,
+            fontSize: "20px",
+            marginTop: 0,
+          }}
+        >
+          Overview of your partner pipeline and activity
+        </p>
       </div>
 
       {/* Metric row */}

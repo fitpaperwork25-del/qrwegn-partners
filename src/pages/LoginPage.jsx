@@ -43,42 +43,12 @@ export default function LoginPage({ onLogin }) {
         return;
       }
 
-      // Fetch profile — treat any failure as non-fatal, fall back to selected mode
-      console.log("FETCHING PROFILE from profiles table, id:", user.id);
-      let profileData = null;
-      try {
-        const { data: pd, error: pe } = await supabase
-          .from("profiles")
-          .select("*")
-          .eq("id", user.id)
-          .single();
-        console.log("PROFILE RESULT:", { data: pd, error: pe });
-        if (!pe) profileData = pd;
-        else console.warn("PROFILE QUERY ERROR (non-fatal):", pe.message);
-      } catch (profileErr) {
-        console.warn("PROFILE FETCH THREW (non-fatal):", profileErr);
-      }
+      // Skip profiles fetch — use tab selection as the role directly
+      const userRole = mode;
+      console.log("NAVIGATING as:", userRole);
 
-      // Role: authoritative from profile row, fallback to selected tab
-      const userRole = profileData?.role || mode;
-      console.log("RESOLVED ROLE:", userRole, "| has profile row:", !!profileData);
-
-      // Role mismatch guards
-      if (mode === "partner" && userRole !== "partner") {
-        setErrorText("This account is not a partner account.");
-        await supabase.auth.signOut();
-        return;
-      }
-      if (mode === "admin" && userRole === "partner") {
-        setErrorText("Partner accounts must use the Partner login tab.");
-        await supabase.auth.signOut();
-        return;
-      }
-
-      // Only navigate if the timeout hasn't already unlocked the page
       if (!timedOut) {
-        console.log("NAVIGATING as:", userRole);
-        onLogin(userRole, { ...profileData, email: user.email, id: user.id });
+        onLogin(userRole, { email: user.email, id: user.id });
       }
 
     } catch (err) {

@@ -67,13 +67,17 @@ export default function AdminDashboard({ navigate }) {
 
   return (
     <div>
-      <div style={{ marginBottom: 28 }}>
+      <div style={{ marginBottom: 36 }}>
         <h1
           style={{
             color: "#ffffff",
-            fontWeight: 700,
-            fontSize: "48px",
-            marginBottom: "10px",
+            fontWeight: 800,
+            fontSize: "56px",
+            lineHeight: 1.05,
+            margin: 0,
+            marginBottom: 14,
+            textShadow: "0 4px 18px rgba(0,0,0,0.65)",
+            letterSpacing: "-1px",
           }}
         >
           Partner Dashboard
@@ -82,9 +86,11 @@ export default function AdminDashboard({ navigate }) {
         <p
           style={{
             color: "#ffffff",
-            opacity: 0.92,
-            fontSize: "20px",
-            marginTop: 0,
+            fontSize: "22px",
+            fontWeight: 500,
+            margin: 0,
+            opacity: 1,
+            textShadow: "0 3px 12px rgba(0,0,0,0.55)",
           }}
         >
           Overview of your partner pipeline and activity

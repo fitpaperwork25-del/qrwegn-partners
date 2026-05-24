@@ -60,9 +60,8 @@ const inputStyle = {
   boxSizing: "border-box",
 };
 
-export default function PartnerPortal({ onLogout }) {
+export default function PartnerPortal({ profile, onLogout }) {
   const [tab, setTab] = useState("home");
-  const [profile, setProfile] = useState(null);
   const [checklist, setChecklist] = useState([]);
   const [materials, setMaterials] = useState([]);
   const [training, setTraining] = useState([]);
@@ -74,25 +73,22 @@ export default function PartnerPortal({ onLogout }) {
   useEffect(() => { init(); }, []);
 
   const init = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-
-    const { data: profileData } = await supabase
-      .from("profiles")
-      .select("*")
-      .eq("id", user.id)
-      .single();
-
-    setProfile({ ...profileData, email: user.email });
+    // Use profile.id from prop; fall back to live session if not available
+    let partnerId = profile?.id;
+    if (!partnerId) {
+      const { data: { user } } = await supabase.auth.getUser();
+      partnerId = user?.id;
+    }
+    if (!partnerId) return;
 
     const { data: checkData } = await supabase
       .from("partner_checklist")
       .select("*")
-      .eq("partner_id", user.id)
+      .eq("partner_id", partnerId)
       .order("sort_order");
 
     if (!checkData || checkData.length === 0) {
-      const rows = DEFAULT_CHECKLIST.map(item => ({ partner_id: user.id, ...item, done: false }));
+      const rows = DEFAULT_CHECKLIST.map(item => ({ partner_id: partnerId, ...item, done: false }));
       const { data: inserted } = await supabase.from("partner_checklist").insert(rows).select();
       setChecklist(inserted || rows);
     } else {
@@ -120,11 +116,10 @@ export default function PartnerPortal({ onLogout }) {
   const pct = totalCount > 0 ? Math.round((doneCount / totalCount) * 100) : 0;
 
   const submitLead = async () => {
-    if (!lead.business_name.trim()) return;
+    if (!lead.business_name.trim() || !profile?.id) return;
     setLeadSaving(true);
-    const { data: { user } } = await supabase.auth.getUser();
     await supabase.from("lead_submissions").insert({
-      partner_id: user.id,
+      partner_id: profile.id,
       business_name: lead.business_name.trim(),
       owner_name: lead.owner_name.trim(),
       phone: lead.phone.trim(),

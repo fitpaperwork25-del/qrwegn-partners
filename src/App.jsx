@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { supabase } from "./lib/supabase";
 import LoginPage from "./pages/LoginPage";
 import AdminDashboard from "./pages/AdminDashboard";
@@ -16,19 +16,34 @@ export default function App() {
   const [profile, setProfile] = useState(null);
   const [selectedPartnerId, setSelectedPartnerId] = useState(null);
 
+  // Restore session on page reload
+  useEffect(() => {
+    if (window.location.hash.includes("type=recovery")) return;
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      if (!session?.user) return;
+      const user = session.user;
+      const { data: profileData } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", user.id)
+        .single();
+      if (!profileData) return;
+      const userRole = profileData.role || "partner";
+      setRole(userRole);
+      setProfile({ ...profileData, email: user.email });
+      setPage(userRole === "admin" ? "dashboard" : "partner-portal");
+    });
+  }, []);
+
   const navigate = (to, params = {}) => {
     setPage(to);
     if (params.partnerId) setSelectedPartnerId(params.partnerId);
   };
 
-  const login = async (userRole, user) => {
+  // Profile is already fetched in LoginPage — just set state
+  const login = (userRole, profileData) => {
     setRole(userRole);
-    const { data: profileData } = await supabase
-      .from("profiles")
-      .select("*")
-      .eq("id", user.id)
-      .single();
-    setProfile({ ...profileData, email: user.email });
+    setProfile(profileData);
     setPage(userRole === "admin" ? "dashboard" : "partner-portal");
   };
 

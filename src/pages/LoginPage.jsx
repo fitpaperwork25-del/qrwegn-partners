@@ -41,10 +41,24 @@ export default function LoginPage({ onLogin }) {
       return;
     }
 
-    const userRole = user.user_metadata?.role || mode;
+    // Use profiles table as the authoritative role source
+    const { data: profileData, error: profileError } = await supabase
+      .from("profiles")
+      .select("*")
+      .eq("id", user.id)
+      .single();
+
+    if (profileError || !profileData) {
+      setErrorText("Could not load your profile. Contact your administrator.");
+      await supabase.auth.signOut();
+      setLoading(false);
+      return;
+    }
+
+    const userRole = profileData.role || mode;
 
     if (mode === "partner" && userRole !== "partner") {
-      setErrorText("This account is not marked as a partner.");
+      setErrorText("This account is not a partner account.");
       await supabase.auth.signOut();
       setLoading(false);
       return;
@@ -58,7 +72,7 @@ export default function LoginPage({ onLogin }) {
     }
 
     setLoading(false);
-    onLogin(userRole, user);
+    onLogin(userRole, { ...profileData, email: user.email });
   };
 
   return (

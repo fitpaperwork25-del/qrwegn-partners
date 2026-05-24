@@ -54,10 +54,11 @@ export default function AdminDashboard({ navigate }) {
     return acc;
   }, {});
 
-  const activeCount    = stageCounts["Active"] || 0;
+  const activeCount     = stageCounts["Active"] || 0;
   const onboardingCount = stageCounts["Onboarding"] || 0;
-  const stalledCount   = stageCounts["Stalled"] || 0;
-  const recentPartners = partners.slice(0, 5);
+  const stalledCount    = stageCounts["Stalled"] || 0;
+  const promotorCount   = partners.filter(p => p.parent_partner_id).length;
+  const recentPartners  = partners.slice(0, 5);
 
   if (loading) return (
     <div style={{ textAlign: "center", padding: "80px 0", color: "#a0c8e8", fontSize: 18 }}>
@@ -98,17 +99,18 @@ export default function AdminDashboard({ navigate }) {
       </div>
 
       {/* Metric row */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14, marginBottom: 24 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 14, marginBottom: 24 }}>
         {[
           { label: "Total Partners", value: partners.length, sub: "in pipeline" },
           { label: "Active",         value: activeCount,     sub: "onboarding businesses" },
           { label: "Onboarding",     value: onboardingCount, sub: "nearly active" },
           { label: "Stalled",        value: stalledCount,    sub: "need attention" },
+          { label: "My Promotors",   value: promotorCount,   sub: "sub-partners assigned" },
         ].map(m => (
           <Card key={m.label} style={{ padding: "16px 20px" }}>
-            <div style={{ fontSize: 17, color: "#a0c8e8", letterSpacing: "0.06em", marginBottom: 6, fontWeight: 500 }}>{m.label.toUpperCase()}</div>
+            <div style={{ fontSize: 12, color: "#a0c8e8", letterSpacing: "0.06em", marginBottom: 6, fontWeight: 600 }}>{m.label.toUpperCase()}</div>
             <div style={{ fontSize: 34, fontWeight: 700, color: "#ffffff", lineHeight: 1 }}>{m.value}</div>
-            <div style={{ fontSize: 18, color: "#7ab0cc", marginTop: 4 }}>{m.sub}</div>
+            <div style={{ fontSize: 13, color: "#7ab0cc", marginTop: 4 }}>{m.sub}</div>
           </Card>
         ))}
       </div>

@@ -5,7 +5,7 @@ import { STAGE_COLORS, STAGES, StageBadge, Card } from "./AdminDashboard";
 const EMPTY_FORM = {
   full_name: "", email: "", phone: "", territory: "",
   languages: "", source: "", stage: "Identified",
-  market_tier: "entry", commission_rate: 20,
+  market_tier: "entry", commission_rate: 20, parent_partner_id: "",
 };
 
 export default function PartnersPage({ navigate }) {
@@ -50,6 +50,7 @@ export default function PartnersPage({ navigate }) {
       stage: form.stage,
       market_tier: form.market_tier,
       commission_rate: Number(form.commission_rate),
+      parent_partner_id: form.parent_partner_id || null,
     });
 
     setSaving(false);
@@ -58,6 +59,16 @@ export default function PartnersPage({ navigate }) {
     setForm(EMPTY_FORM);
     loadPartners();
   };
+
+  // Promotor hierarchy
+  const promotorsByParent = partners.reduce((acc, p) => {
+    if (!p.parent_partner_id) return acc;
+    if (!acc[p.parent_partner_id]) acc[p.parent_partner_id] = [];
+    acc[p.parent_partner_id].push(p);
+    return acc;
+  }, {});
+  const parentPartners = partners.filter(p => promotorsByParent[p.id]);
+  const totalPromotors = partners.filter(p => p.parent_partner_id).length;
 
   const filtered = partners.filter(p => {
     const matchStage = filterStage === "All" || p.stage === filterStage;
@@ -208,6 +219,79 @@ export default function PartnersPage({ navigate }) {
         </div>
       )}
 
+      {/* Team Members / Promotor Hierarchy */}
+      <div style={{ marginTop: 32 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+          <div>
+            <h2 style={{ fontSize: 20, fontWeight: 700, color: "#ffffff", margin: 0 }}>Team Members</h2>
+            <p style={{ fontSize: 13, color: "#5a8aaa", margin: "3px 0 0" }}>{totalPromotors} promotor{totalPromotors !== 1 ? "s" : ""} across {parentPartners.length} partner{parentPartners.length !== 1 ? "s" : ""}</p>
+          </div>
+        </div>
+
+        <Card style={{ padding: 0, overflow: "hidden" }}>
+          {parentPartners.length === 0 ? (
+            <div style={{ padding: "40px 0", textAlign: "center", color: "#4a7090", fontSize: 14 }}>
+              No team hierarchy yet. Assign a parent partner when adding a promotor.
+            </div>
+          ) : parentPartners.map(parent => {
+            const team = promotorsByParent[parent.id] || [];
+            return (
+              <div key={parent.id} style={{ borderBottom: "1px solid rgba(50,80,140,0.25)" }}>
+                {/* Parent row */}
+                <div style={{ padding: "12px 20px", background: "rgba(80,130,200,0.07)", display: "flex", alignItems: "center", gap: 10 }}>
+                  <div style={{
+                    width: 30, height: 30, borderRadius: "50%",
+                    background: "linear-gradient(135deg, #1a3560, #0d2045)",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    fontSize: 12, fontWeight: 700, color: "#5ab0f0", flexShrink: 0,
+                  }}>
+                    {(parent.full_name || "?").split(" ").map(n => n[0]).join("").slice(0, 2)}
+                  </div>
+                  <span style={{ fontSize: 14, fontWeight: 700, color: "#c0d8e8" }}>{parent.full_name}</span>
+                  <span style={{ fontSize: 12, color: "#5ab0f0", background: "rgba(80,160,230,0.12)", border: "1px solid rgba(80,160,230,0.22)", padding: "2px 9px", borderRadius: 20, fontWeight: 600 }}>
+                    {team.length} promotor{team.length !== 1 ? "s" : ""}
+                  </span>
+                  <span style={{ fontSize: 12, color: "#4a7090", marginLeft: "auto" }}>{parent.territory || ""}</span>
+                </div>
+
+                {/* Promotor table */}
+                <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                  <thead>
+                    <tr style={{ background: "rgba(50,80,140,0.08)" }}>
+                      {["Name", "Email", "Territory", "Commission", "Stage"].map(h => (
+                        <th key={h} style={{ padding: "8px 20px", textAlign: "left", fontSize: 11, color: "#4a7090", fontWeight: 700, letterSpacing: "0.08em" }}>
+                          {h.toUpperCase()}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {team.map(p => (
+                      <tr key={p.id}
+                        onClick={() => navigate("partner-profile", { partnerId: p.id })}
+                        style={{ borderTop: "1px solid rgba(50,80,140,0.18)", cursor: "pointer", transition: "background 0.1s" }}
+                        onMouseEnter={e => e.currentTarget.style.background = "rgba(80,140,210,0.05)"}
+                        onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+                        <td style={{ padding: "11px 20px" }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                            <div style={{ width: 6, height: 6, borderRadius: "50%", background: "rgba(80,160,230,0.4)", flexShrink: 0 }} />
+                            <span style={{ fontSize: 14, fontWeight: 600, color: "#ffffff" }}>{p.full_name}</span>
+                          </div>
+                        </td>
+                        <td style={{ padding: "11px 20px", fontSize: 13, color: "#6a9ab8" }}>{p.email || "—"}</td>
+                        <td style={{ padding: "11px 20px", fontSize: 13, color: "#6a9ab8" }}>{p.territory || "—"}</td>
+                        <td style={{ padding: "11px 20px", fontSize: 13, color: "#6a9ab8" }}>{p.commission_rate != null ? `${p.commission_rate}%` : "—"}</td>
+                        <td style={{ padding: "11px 20px" }}><StageBadge stage={p.stage || "Identified"} /></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            );
+          })}
+        </Card>
+      </div>
+
       {/* Add Partner Modal */}
       {showModal && (
         <div style={{
@@ -266,6 +350,15 @@ export default function PartnersPage({ navigate }) {
               <div>
                 <label style={labelStyle}>COMMISSION RATE (%)</label>
                 <input style={inputStyle} type="number" min={0} max={100} value={form.commission_rate} onChange={e => setForm(f => ({ ...f, commission_rate: e.target.value }))} />
+              </div>
+              <div style={{ gridColumn: "1 / -1" }}>
+                <label style={labelStyle}>PARENT PARTNER (optional)</label>
+                <select style={inputStyle} value={form.parent_partner_id} onChange={e => setForm(f => ({ ...f, parent_partner_id: e.target.value }))}>
+                  <option value="">— None (top-level partner) —</option>
+                  {partners.map(p => (
+                    <option key={p.id} value={p.id}>{p.full_name}{p.territory ? ` · ${p.territory}` : ""}</option>
+                  ))}
+                </select>
               </div>
             </div>
 

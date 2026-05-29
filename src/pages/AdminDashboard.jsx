@@ -67,8 +67,8 @@ export default function AdminDashboard({ navigate }) {
     const load = async () => {
       const [partnersRes, leadsRes] = await Promise.all([
         supabase.from("partners").select("*").order("created_at", { ascending: false }),
-        supabase.from("lead_submissions")
-          .select("*, profiles(full_name)")
+        supabase.from("leads")
+          .select("*, partners(full_name)")
           .order("created_at", { ascending: false }),
       ]);
       if (!partnersRes.error) setPartners(partnersRes.data || []);
@@ -194,14 +194,14 @@ export default function AdminDashboard({ navigate }) {
                     onMouseLeave={e => e.currentTarget.style.background = "transparent"}
                   >
                     <td style={{ padding: "12px 14px", fontSize: 14, fontWeight: 600, color: "#ffffff", whiteSpace: "nowrap" }}>{l.business_name}</td>
-                    <td style={{ padding: "12px 14px", fontSize: 14, color: "#b0cce0" }}>{l.owner_name || "—"}</td>
+                    <td style={{ padding: "12px 14px", fontSize: 14, color: "#b0cce0" }}>{l.contact_name || "—"}</td>
                     <td style={{ padding: "12px 14px", fontSize: 13, color: "#7ab0cc", whiteSpace: "nowrap" }}>{l.phone || "—"}</td>
                     <td style={{ padding: "12px 14px", fontSize: 13, color: "#7ab0cc" }}>{l.country || "—"}</td>
                     <td style={{ padding: "12px 14px", fontSize: 13, color: "#7ab0cc", maxWidth: 220 }}>
                       {l.notes ? (l.notes.length > 60 ? l.notes.slice(0, 60) + "…" : l.notes) : "—"}
                     </td>
                     <td style={{ padding: "12px 14px" }}><LeadStatusBadge status={l.status} /></td>
-                    <td style={{ padding: "12px 14px", fontSize: 13, color: "#5ab0f0", whiteSpace: "nowrap" }}>{l.profiles?.full_name || "—"}</td>
+                    <td style={{ padding: "12px 14px", fontSize: 13, color: "#5ab0f0", whiteSpace: "nowrap" }}>{l.partners?.full_name || "—"}</td>
                     <td style={{ padding: "12px 14px", fontSize: 13, color: "#7ab0cc", whiteSpace: "nowrap" }}>{fmtDate(l.created_at)}</td>
                   </tr>
                 ))}

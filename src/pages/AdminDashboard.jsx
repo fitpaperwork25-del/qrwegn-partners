@@ -33,17 +33,46 @@ const StageBadge = ({ stage }) => {
   );
 };
 
+const LEAD_STATUS_COLORS = {
+  new:       { color: "#5ab0f0", bg: "rgba(100,160,220,0.18)" },
+  contacted: { color: "#5aaae0", bg: "rgba(120,180,240,0.12)" },
+  qualified: { color: "#35c080", bg: "rgba(80,180,140,0.12)" },
+  closed:    { color: "#35c060", bg: "rgba(40,180,80,0.12)" },
+  rejected:  { color: "#f07070", bg: "rgba(220,80,80,0.12)" },
+};
+
+const LeadStatusBadge = ({ status }) => {
+  const c = LEAD_STATUS_COLORS[status] || LEAD_STATUS_COLORS.new;
+  return (
+    <span style={{
+      background: c.bg, color: c.color, fontSize: 12, fontWeight: 700,
+      padding: "3px 10px", borderRadius: 20, letterSpacing: "0.06em",
+      textTransform: "uppercase",
+    }}>{status || "new"}</span>
+  );
+};
+
+function fmtDate(iso) {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+}
+
 export default function AdminDashboard({ navigate }) {
   const [partners, setPartners] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [leads,    setLeads]    = useState([]);
+  const [loading,  setLoading]  = useState(true);
 
   useEffect(() => {
     const load = async () => {
-      const { data, error } = await supabase
-        .from("partners")
-        .select("*")
-        .order("created_at", { ascending: false });
-      if (!error) setPartners(data || []);
+      const [partnersRes, leadsRes] = await Promise.all([
+        supabase.from("partners").select("*").order("created_at", { ascending: false }),
+        supabase.from("lead_submissions")
+          .select("*, profiles(full_name)")
+          .order("created_at", { ascending: false }),
+      ]);
+      if (!partnersRes.error) setPartners(partnersRes.data || []);
+      if (!leadsRes.error)    setLeads(leadsRes.data || []);
       setLoading(false);
     };
     load();
@@ -133,6 +162,53 @@ export default function AdminDashboard({ navigate }) {
             );
           })}
         </div>
+      </Card>
+
+      {/* Submitted leads */}
+      <Card style={{ marginBottom: 24 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+          <div style={{ fontSize: 18, fontWeight: 600, color: "#a0c8e8", letterSpacing: "0.08em" }}>
+            SUBMITTED LEADS
+            <span style={{ marginLeft: 10, fontSize: 14, color: "#5ab0f0", fontWeight: 700 }}>{leads.length}</span>
+          </div>
+        </div>
+        {leads.length === 0 ? (
+          <p style={{ fontSize: 16, color: "#7ab0cc", textAlign: "center", padding: "24px 0" }}>No leads submitted yet</p>
+        ) : (
+          <div style={{ overflowX: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+              <thead>
+                <tr style={{ borderBottom: "1px solid rgba(100,160,220,0.35)" }}>
+                  {["Business", "Owner", "Phone", "Country", "Notes", "Status", "Submitted by", "Date"].map(h => (
+                    <th key={h} style={{ padding: "10px 14px", textAlign: "left", fontSize: 11, color: "#a0c8e8", fontWeight: 700, letterSpacing: "0.08em", whiteSpace: "nowrap" }}>
+                      {h.toUpperCase()}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {leads.map((l, i) => (
+                  <tr key={l.id}
+                    style={{ borderBottom: i < leads.length - 1 ? "1px solid rgba(100,160,220,0.14)" : "none" }}
+                    onMouseEnter={e => e.currentTarget.style.background = "rgba(100,160,220,0.04)"}
+                    onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+                  >
+                    <td style={{ padding: "12px 14px", fontSize: 14, fontWeight: 600, color: "#ffffff", whiteSpace: "nowrap" }}>{l.business_name}</td>
+                    <td style={{ padding: "12px 14px", fontSize: 14, color: "#b0cce0" }}>{l.owner_name || "—"}</td>
+                    <td style={{ padding: "12px 14px", fontSize: 13, color: "#7ab0cc", whiteSpace: "nowrap" }}>{l.phone || "—"}</td>
+                    <td style={{ padding: "12px 14px", fontSize: 13, color: "#7ab0cc" }}>{l.country || "—"}</td>
+                    <td style={{ padding: "12px 14px", fontSize: 13, color: "#7ab0cc", maxWidth: 220 }}>
+                      {l.notes ? (l.notes.length > 60 ? l.notes.slice(0, 60) + "…" : l.notes) : "—"}
+                    </td>
+                    <td style={{ padding: "12px 14px" }}><LeadStatusBadge status={l.status} /></td>
+                    <td style={{ padding: "12px 14px", fontSize: 13, color: "#5ab0f0", whiteSpace: "nowrap" }}>{l.profiles?.full_name || "—"}</td>
+                    <td style={{ padding: "12px 14px", fontSize: 13, color: "#7ab0cc", whiteSpace: "nowrap" }}>{fmtDate(l.created_at)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </Card>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>

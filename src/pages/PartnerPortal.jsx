@@ -96,6 +96,7 @@ export default function PartnerPortal({ profile, onLogout }) {
   const [lead, setLead] = useState(emptyLead);
   const [leadSaving, setLeadSaving] = useState(false);
   const [leadSuccess, setLeadSuccess] = useState(false);
+  const [leadError, setLeadError] = useState("");
   const [loading, setLoading] = useState(true);
 
   useEffect(() => { init(); }, []);
@@ -118,7 +119,8 @@ export default function PartnerPortal({ profile, onLogout }) {
   const submitLead = async () => {
     if (!lead.business_name.trim() || !profile?.id) return;
     setLeadSaving(true);
-    await supabase.from("lead_submissions").insert({
+    setLeadError("");
+    const { error } = await supabase.from("lead_submissions").insert({
       partner_id: profile.id,
       business_name: lead.business_name.trim(),
       owner_name: lead.owner_name.trim(),
@@ -126,8 +128,13 @@ export default function PartnerPortal({ profile, onLogout }) {
       country: lead.country.trim(),
       notes: lead.notes.trim(),
     });
-    setLead(emptyLead);
     setLeadSaving(false);
+    if (error) {
+      console.error("submitLead error:", error);
+      setLeadError(error.message || "Failed to submit lead. Please try again.");
+      return;
+    }
+    setLead(emptyLead);
     setLeadSuccess(true);
     setTimeout(() => setLeadSuccess(false), 3500);
   };
@@ -487,6 +494,12 @@ export default function PartnerPortal({ profile, onLogout }) {
                   <path d="M1 6L5 10L13 1" stroke="#35c060" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
                 Lead submitted successfully!
+              </div>
+            )}
+
+            {leadError && (
+              <div style={{ background: "rgba(220,60,60,0.08)", border: "1px solid rgba(220,60,60,0.3)", borderRadius: 10, padding: "12px 16px", marginBottom: 18, fontSize: 13, color: "#f07070" }}>
+                {leadError}
               </div>
             )}
 

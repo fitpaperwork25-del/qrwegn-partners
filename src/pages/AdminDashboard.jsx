@@ -64,18 +64,20 @@ export default function AdminDashboard({ navigate }) {
   const [loading,  setLoading]  = useState(true);
 
   useEffect(() => {
-    const load = async () => {
-      const [partnersRes, leadsRes] = await Promise.all([
-        supabase.from("partners").select("*").order("created_at", { ascending: false }),
-        supabase.from("leads")
-          .select("*, partners(full_name)")
-          .order("created_at", { ascending: false }),
-      ]);
-      if (!partnersRes.error) setPartners(partnersRes.data || []);
-      if (!leadsRes.error)    setLeads(leadsRes.data || []);
-      setLoading(false);
-    };
-    load();
+    // Partners unblocks the dashboard render immediately.
+    supabase.from("partners").select("*").order("created_at", { ascending: false })
+      .then(({ data, error }) => {
+        if (!error) setPartners(data || []);
+        setLoading(false);
+      });
+
+    // Leads loads independently — a slow query never delays the page.
+    supabase.from("leads")
+      .select("*, partners(full_name)")
+      .order("created_at", { ascending: false })
+      .then(({ data, error }) => {
+        if (!error) setLeads(data || []);
+      });
   }, []);
 
   const stageCounts = STAGES.reduce((acc, s) => {

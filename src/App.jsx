@@ -102,20 +102,19 @@ function ResetPasswordPage({ setPage }) {
       display: "flex",
       alignItems: "center",
       justifyContent: "center",
-      background: "linear-gradient(160deg, #c8e8f8 0%, #dbeeff 25%, #e8f4fd 50%, #d4ecfb 75%, #eaf6ff 100%)",
+      background: "#080808",
     }}>
       <div style={{
-        background: "rgba(255,255,255,0.75)",
-        backdropFilter: "blur(24px)",
+        background: "#111111",
         borderRadius: 20,
         padding: "42px",
         width: 400,
-        boxShadow: "0 8px 48px rgba(100,160,220,0.15)",
-        border: "1px solid rgba(255,255,255,0.9)",
+        boxShadow: "0 8px 48px rgba(0,0,0,0.5)",
+        border: "1px solid rgba(255,255,255,0.08)",
       }}>
         <img src="/Logo.png" alt="QR-Wegn" style={{ width: 170, display: "block", margin: "0 auto 20px" }} />
 
-        <h2 style={{ color: "#1a3a5a", textAlign: "center" }}>Set New Password</h2>
+        <h2 style={{ color: "#F0EDE8", textAlign: "center" }}>Set New Password</h2>
 
         <input
           type="password"
@@ -127,9 +126,12 @@ function ResetPasswordPage({ setPage }) {
             padding: "12px 14px",
             borderRadius: 10,
             fontSize: 14,
-            border: "1.5px solid rgba(100,160,220,0.2)",
+            background: "#080808",
+            border: "1.5px solid rgba(255,255,255,0.08)",
+            color: "#F0EDE8",
             boxSizing: "border-box",
             marginBottom: 16,
+            outline: "none",
           }}
         />
 
@@ -138,17 +140,17 @@ function ResetPasswordPage({ setPage }) {
           padding: "13px 0",
           borderRadius: 10,
           border: "none",
-          background: "linear-gradient(135deg, #3a9ad9, #2a7ab8)",
-          color: "white",
+          background: "#E8C547",
+          color: "#080808",
           fontSize: 15,
-          fontWeight: 600,
+          fontWeight: 700,
           cursor: "pointer",
         }}>
           {loading ? "Updating..." : "Update Password"}
         </button>
 
         {message && (
-          <p style={{ marginTop: 16, color: "#2a5a7a", fontSize: 13, textAlign: "center" }}>
+          <p style={{ marginTop: 16, color: "#666666", fontSize: 13, textAlign: "center" }}>
             {message}
           </p>
         )}
@@ -166,7 +168,7 @@ function AdminLayout({ children, page, navigate, onLogout, profile }) {
   ];
 
   return (
-    <div style={{ display: "flex", minHeight: "100vh", background: "linear-gradient(135deg, #e8f4fd 0%, #dbeeff 30%, #e4f0fb 60%, #f0f8ff 100%)" }}>
+    <div style={{ display: "flex", minHeight: "100vh", background: "#080808" }}>
       <aside style={{
         width: 220, background: "#0B1739",
         borderRight: "1px solid rgba(255,255,255,0.08)", display: "flex", flexDirection: "column",

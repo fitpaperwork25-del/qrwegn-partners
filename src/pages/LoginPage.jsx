@@ -46,8 +46,16 @@ export default function LoginPage({ onLogin }) {
       const userRole = mode;
       console.log("NAVIGATING as:", userRole);
 
-      const { data: profileData } = await supabase
-        .from("profiles").select("*").eq("id", user.id).single();
+      let profileData = null;
+      try {
+        const profileFetch = supabase
+          .from("profiles").select("*").eq("id", user.id).single();
+        const timeout = new Promise(resolve => setTimeout(resolve, 2500));
+        const result = await Promise.race([profileFetch, timeout]);
+        if (result?.data) profileData = result.data;
+      } catch (profileErr) {
+        console.warn("profiles fetch failed, proceeding without it:", profileErr);
+      }
 
       if (!timedOut) {
         onLogin(userRole, { ...profileData, email: user.email, id: user.id });

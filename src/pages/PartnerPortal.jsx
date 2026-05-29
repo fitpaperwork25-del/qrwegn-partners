@@ -121,7 +121,7 @@ export default function PartnerPortal({ profile, onLogout }) {
     setLeadSaving(true);
     setLeadError("");
     const { error } = await supabase.from("leads").insert({
-      submitted_by_partner_id: profile.id,
+      submitted_by_partner_id: profile.partner_id,
       business_name: lead.business_name.trim(),
       contact_name: lead.owner_name.trim(),
       phone: lead.phone.trim(),

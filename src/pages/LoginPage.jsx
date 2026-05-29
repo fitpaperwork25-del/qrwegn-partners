@@ -43,12 +43,14 @@ export default function LoginPage({ onLogin }) {
         return;
       }
 
-      // Skip profiles fetch — use tab selection as the role directly
       const userRole = mode;
       console.log("NAVIGATING as:", userRole);
 
+      const { data: profileData } = await supabase
+        .from("profiles").select("*").eq("id", user.id).single();
+
       if (!timedOut) {
-        onLogin(userRole, { email: user.email, id: user.id });
+        onLogin(userRole, { ...profileData, email: user.email, id: user.id });
       }
 
     } catch (err) {

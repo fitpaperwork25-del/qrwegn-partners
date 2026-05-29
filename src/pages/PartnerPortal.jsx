@@ -120,10 +120,10 @@ export default function PartnerPortal({ profile, onLogout }) {
     if (!lead.business_name.trim() || !profile?.id) return;
     setLeadSaving(true);
     setLeadError("");
-    const { error } = await supabase.from("lead_submissions").insert({
-      partner_id: profile.id,
+    const { error } = await supabase.from("leads").insert({
+      submitted_by_partner_id: profile.id,
       business_name: lead.business_name.trim(),
-      owner_name: lead.owner_name.trim(),
+      contact_name: lead.owner_name.trim(),
       phone: lead.phone.trim(),
       country: lead.country.trim(),
       notes: lead.notes.trim(),

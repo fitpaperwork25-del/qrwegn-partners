@@ -64,12 +64,21 @@ export default function AdminDashboard({ navigate }) {
   const [loading,  setLoading]  = useState(true);
 
   useEffect(() => {
-    // Partners unblocks the dashboard render immediately.
-    supabase.from("partners").select("*").order("created_at", { ascending: false })
-      .then(({ data, error }) => {
-        if (!error) setPartners(data || []);
+    // Partners unblocks the dashboard render; races against 2.5s so setLoading(false)
+    // always fires even if the query hangs.
+    (async () => {
+      try {
+        const partnersFetch = supabase
+          .from("partners").select("*").order("created_at", { ascending: false });
+        const timeout = new Promise(resolve => setTimeout(resolve, 2500));
+        const result = await Promise.race([partnersFetch, timeout]);
+        if (result?.data) setPartners(result.data);
+      } catch (e) {
+        console.warn("partners fetch failed:", e);
+      } finally {
         setLoading(false);
-      });
+      }
+    })();
 
     // Leads loads independently — a slow query never delays the page.
     supabase.from("leads")

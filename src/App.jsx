@@ -22,15 +22,21 @@ export default function App() {
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (!session?.user) return;
       const user = session.user;
-      const { data: profileData } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("id", user.id)
-        .single();
-      if (!profileData) return;
-      const userRole = profileData.role || "partner";
+
+      let profileData = null;
+      try {
+        const profileFetch = supabase
+          .from("profiles").select("*").eq("id", user.id).single();
+        const timeout = new Promise(resolve => setTimeout(resolve, 2500));
+        const result = await Promise.race([profileFetch, timeout]);
+        if (result?.data) profileData = result.data;
+      } catch (e) {
+        console.warn("session-restore profiles fetch failed:", e);
+      }
+
+      const userRole = profileData?.role || "admin";
       setRole(userRole);
-      setProfile({ ...profileData, email: user.email });
+      setProfile({ ...profileData, email: user.email, id: user.id });
       setPage(userRole === "admin" ? "dashboard" : "partner-portal");
     });
   }, []);

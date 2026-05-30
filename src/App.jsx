@@ -7,6 +7,7 @@ import PartnerProfile from "./pages/PartnerProfile";
 import TrainingPage from "./pages/TrainingPage";
 import MaterialsPage from "./pages/MaterialsPage";
 import PartnerPortal from "./pages/PartnerPortal";
+import PromotorPortal from "./pages/PromotorPortal";
 
 export default function App() {
   const [page, setPage] = useState(
@@ -64,19 +65,28 @@ export default function App() {
   if (page === "reset-password") return <ResetPasswordPage setPage={setPage} />;
   if (page === "login") return <LoginPage onLogin={login} />;
 
+  if (role === "promotor") {
+    return <PromotorPortal profile={profile} onLogout={logout} />;
+  }
+
   if (role === "partner") {
     return <PartnerPortal profile={profile} onLogout={logout} />;
   }
 
-  return (
-    <AdminLayout page={page} navigate={navigate} onLogout={logout} profile={profile}>
-      {page === "dashboard" && <AdminDashboard navigate={navigate} />}
-      {page === "partners" && <PartnersPage navigate={navigate} />}
-      {page === "partner-profile" && <PartnerProfile partnerId={selectedPartnerId} navigate={navigate} />}
-      {page === "training" && <TrainingPage />}
-      {page === "materials" && <MaterialsPage />}
-    </AdminLayout>
-  );
+  if (role === "admin") {
+    return (
+      <AdminLayout page={page} navigate={navigate} onLogout={logout} profile={profile}>
+        {page === "dashboard" && <AdminDashboard navigate={navigate} />}
+        {page === "partners" && <PartnersPage navigate={navigate} />}
+        {page === "partner-profile" && <PartnerProfile partnerId={selectedPartnerId} navigate={navigate} />}
+        {page === "training" && <TrainingPage />}
+        {page === "materials" && <MaterialsPage />}
+      </AdminLayout>
+    );
+  }
+
+  // Unknown or no role — never show admin UI
+  return <LoginPage onLogin={login} />;
 }
 
 function ResetPasswordPage({ setPage }) {

@@ -98,12 +98,64 @@ export default function PartnerPortal({ profile, onLogout }) {
   const [leadSuccess, setLeadSuccess] = useState(false);
   const [leadError, setLeadError] = useState("");
   const [loading, setLoading] = useState(true);
+  const [recruitForm,    setRecruitForm]    = useState({ full_name: "", email: "", phone: "", country: "", type: "individual" });
+  const [recruitSaving,  setRecruitSaving]  = useState(false);
+  const [recruitSuccess, setRecruitSuccess] = useState(false);
+  const [recruitError,   setRecruitError]   = useState("");
+  const [showRecruitForm, setShowRecruitForm] = useState(false);
 
-  useEffect(() => { init(); }, []);
+  useEffect(() => { init(); loadPromotors(); }, []);
 
   const init = () => {
     setChecklist(DEFAULT_CHECKLIST.map(item => ({ ...item, done: false })));
     setLoading(false);
+  };
+
+  const loadPromotors = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("promotors").select("*").order("created_at", { ascending: false });
+      if (!error) setPromotors(data || []);
+    } catch (e) {
+      console.warn("promotors fetch failed:", e);
+    }
+  };
+
+  const recruitPromotor = async () => {
+    if (!recruitForm.full_name.trim() || !profile?.id) return;
+    setRecruitSaving(true);
+    setRecruitError("");
+
+    const { data: { user } } = await supabase.auth.getUser();
+    const { data: profileRow } = await supabase
+      .from("profiles").select("partner_id").eq("id", user.id).single();
+
+    if (!profileRow?.partner_id) {
+      setRecruitSaving(false);
+      setRecruitError("Your account isn't linked to a partner record. Contact admin.");
+      return;
+    }
+
+    const { error } = await supabase.from("promotors").insert({
+      partner_id: profileRow.partner_id,
+      full_name:  recruitForm.full_name.trim(),
+      email:      recruitForm.email.trim()   || null,
+      phone:      recruitForm.phone.trim()   || null,
+      country:    recruitForm.country.trim() || null,
+      type:       recruitForm.type           || "individual",
+      status:     "active",
+    });
+    setRecruitSaving(false);
+    if (error) {
+      console.error("recruitPromotor error:", error);
+      setRecruitError(error.message || "Failed to add promotor. Please try again.");
+      return;
+    }
+    setRecruitForm({ full_name: "", email: "", phone: "", country: "", type: "individual" });
+    setShowRecruitForm(false);
+    setRecruitSuccess(true);
+    setTimeout(() => setRecruitSuccess(false), 3500);
+    loadPromotors();
   };
 
   const toggleCheck = async (item) => {
@@ -338,19 +390,17 @@ export default function PartnerPortal({ profile, onLogout }) {
 
         {/* MY PROMOTORS */}
         {tab === "my-promotors" && (() => {
-          const activeCount     = promotors.filter(p => p.stage === "Active").length;
-          const bizTotal        = promotors.reduce((s, p) => s + (p.businesses_count || 0), 0);
-          const pendingComm     = commissions.filter(c => c.status === "pending").reduce((s, c) => s + (Number(c.amount) || 0), 0);
+          const activeCount = promotors.filter(p => p.status === "active").length;
 
           return (
             <div>
               {/* Summary cards */}
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 12, marginBottom: 24 }}>
                 {[
-                  { label: "Total Promotors",      value: promotors.length,                       color: "#5ab0f0" },
-                  { label: "Active Promotors",      value: activeCount,                            color: "#35c060" },
-                  { label: "Businesses Onboarded",  value: bizTotal,                               color: "#c080f0" },
-                  { label: "Pending Commissions",   value: `$${pendingComm.toLocaleString()}`,     color: "#e8c547" },
+                  { label: "Total Promotors",     value: promotors.length, color: "#5ab0f0" },
+                  { label: "Active Promotors",     value: activeCount,      color: "#35c060" },
+                  { label: "Businesses Onboarded", value: 0,                color: "#c080f0" },
+                  { label: "Pending Commissions",  value: "$0",             color: "#e8c547" },
                 ].map(m => (
                   <Card key={m.label} style={{ padding: "16px 18px" }}>
                     <div style={{ fontSize: 10, fontWeight: 700, color: "#4a7090", letterSpacing: "0.1em", marginBottom: 8 }}>{m.label.toUpperCase()}</div>
@@ -359,64 +409,133 @@ export default function PartnerPortal({ profile, onLogout }) {
                 ))}
               </div>
 
+              {/* Recruit button + success banner */}
+              <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 14 }}>
+                <button
+                  onClick={() => { setShowRecruitForm(f => !f); setRecruitError(""); }}
+                  style={{ padding: "8px 18px", borderRadius: 8, border: "none", cursor: "pointer", background: "rgba(80,160,230,0.18)", color: "#5ab0f0", fontSize: 13, fontWeight: 700 }}
+                >
+                  {showRecruitForm ? "Cancel" : "+ Recruit Promotor"}
+                </button>
+              </div>
+
+              {recruitSuccess && (
+                <div style={{ background: "rgba(40,180,80,0.08)", border: "1px solid rgba(40,180,80,0.22)", borderRadius: 10, padding: "12px 16px", marginBottom: 16, fontSize: 13, color: "#35c060", display: "flex", alignItems: "center", gap: 8 }}>
+                  <svg width="14" height="12" viewBox="0 0 14 12" fill="none"><path d="M1 6L5 10L13 1" stroke="#35c060" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                  Promotor added successfully!
+                </div>
+              )}
+
+              {/* Recruit form */}
+              {showRecruitForm && (
+                <Card style={{ marginBottom: 20 }}>
+                  <SectionLabel>NEW PROMOTOR</SectionLabel>
+                  {recruitError && (
+                    <div style={{ background: "rgba(220,60,60,0.08)", border: "1px solid rgba(220,60,60,0.3)", borderRadius: 10, padding: "10px 14px", marginBottom: 14, fontSize: 13, color: "#f07070" }}>
+                      {recruitError}
+                    </div>
+                  )}
+                  <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                    {[
+                      { key: "full_name", label: "Full Name",    required: true,  placeholder: "e.g. Dawit Haile" },
+                      { key: "email",     label: "Email",        required: false, placeholder: "dawit@example.com" },
+                      { key: "phone",     label: "Phone",        required: false, placeholder: "+251 ..." },
+                      { key: "country",   label: "Country",      required: false, placeholder: "e.g. Ethiopia" },
+                    ].map(({ key, label, required, placeholder }) => (
+                      <div key={key}>
+                        <label style={{ fontSize: 11, fontWeight: 700, color: "#4a7090", letterSpacing: "0.08em", display: "block", marginBottom: 4 }}>
+                          {label.toUpperCase()}{required && <span style={{ color: "#e8c547", marginLeft: 3 }}>*</span>}
+                        </label>
+                        <input
+                          value={recruitForm[key]}
+                          onChange={e => setRecruitForm(f => ({ ...f, [key]: e.target.value }))}
+                          placeholder={placeholder}
+                          style={{ width: "100%", padding: "10px 12px", borderRadius: 8, border: "1px solid rgba(50,80,140,0.3)", background: "rgba(4,10,24,0.85)", color: "#c0d8e8", fontSize: 14, outline: "none", boxSizing: "border-box" }}
+                        />
+                      </div>
+                    ))}
+                    <div>
+                      <label style={{ fontSize: 11, fontWeight: 700, color: "#4a7090", letterSpacing: "0.08em", display: "block", marginBottom: 4 }}>TYPE</label>
+                      <select
+                        value={recruitForm.type}
+                        onChange={e => setRecruitForm(f => ({ ...f, type: e.target.value }))}
+                        style={{ width: "100%", padding: "10px 12px", borderRadius: 8, border: "1px solid rgba(50,80,140,0.3)", background: "rgba(4,10,24,0.85)", color: "#c0d8e8", fontSize: 14, outline: "none", cursor: "pointer" }}
+                      >
+                        <option value="individual">Individual</option>
+                        <option value="business">Business</option>
+                      </select>
+                    </div>
+                    <button
+                      onClick={recruitPromotor}
+                      disabled={recruitSaving || !recruitForm.full_name.trim()}
+                      style={{
+                        padding: "11px 0", borderRadius: 9, border: "none",
+                        background: recruitSaving || !recruitForm.full_name.trim() ? "rgba(80,140,210,0.18)" : "linear-gradient(135deg, #3a9ad9, #2a7ab8)",
+                        color: recruitSaving || !recruitForm.full_name.trim() ? "#3a5a70" : "white",
+                        fontSize: 14, fontWeight: 700,
+                        cursor: recruitSaving || !recruitForm.full_name.trim() ? "default" : "pointer",
+                      }}
+                    >
+                      {recruitSaving ? "Adding…" : "Add Promotor"}
+                    </button>
+                  </div>
+                </Card>
+              )}
+
               {/* Promotor cards */}
               {promotors.length === 0 ? (
                 <Card style={{ textAlign: "center", padding: "52px 24px" }}>
                   <div style={{ fontSize: 36, marginBottom: 14 }}>👥</div>
                   <div style={{ fontSize: 16, fontWeight: 600, color: "#b0cce0", marginBottom: 8 }}>No promotors yet</div>
-                  <div style={{ fontSize: 13, color: "#4a7090" }}>Share your referral link to recruit sub-partners under you.</div>
+                  <div style={{ fontSize: 13, color: "#4a7090" }}>Use the Recruit Promotor button to add your first one.</div>
                 </Card>
               ) : (
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 14 }}>
-                  {promotors.map(p => (
-                    <Card key={p.id} style={{ display: "flex", flexDirection: "column", gap: 0 }}>
-                      {/* Header */}
-                      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
-                        <div style={{
-                          width: 42, height: 42, borderRadius: "50%", flexShrink: 0,
-                          background: "linear-gradient(135deg, #1a3a6a, #0d2045)",
-                          border: "1.5px solid rgba(80,140,200,0.3)",
-                          display: "flex", alignItems: "center", justifyContent: "center",
-                          fontSize: 14, fontWeight: 700, color: "#5ab0f0",
-                        }}>
-                          {(p.full_name || "?").split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase()}
+                  {promotors.map(p => {
+                    const location = [p.city, p.country].filter(Boolean).join(", ") || "—";
+                    return (
+                      <Card key={p.id} style={{ display: "flex", flexDirection: "column", gap: 0 }}>
+                        {/* Header */}
+                        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
+                          <div style={{
+                            width: 42, height: 42, borderRadius: "50%", flexShrink: 0,
+                            background: "linear-gradient(135deg, #1a3a6a, #0d2045)",
+                            border: "1.5px solid rgba(80,140,200,0.3)",
+                            display: "flex", alignItems: "center", justifyContent: "center",
+                            fontSize: 14, fontWeight: 700, color: "#5ab0f0",
+                          }}>
+                            {(p.full_name || "?").split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase()}
+                          </div>
+                          <div style={{ minWidth: 0 }}>
+                            <div style={{ fontSize: 14, fontWeight: 700, color: "#c0d8e8", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.full_name || "—"}</div>
+                            <div style={{ fontSize: 12, color: "#4a7090", marginTop: 2 }}>{location}</div>
+                          </div>
                         </div>
-                        <div style={{ minWidth: 0 }}>
-                          <div style={{ fontSize: 14, fontWeight: 700, color: "#c0d8e8", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.full_name || "—"}</div>
-                          <div style={{ fontSize: 12, color: "#4a7090", marginTop: 2 }}>{p.territory || "No territory set"}</div>
-                        </div>
-                      </div>
 
-                      {/* Stage + commission */}
-                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-                        <StagePill stage={p.stage || "Identified"} />
-                        <span style={{ fontSize: 12, color: "#5a8aaa" }}>
-                          {p.commission_rate != null ? `${p.commission_rate}% commission` : "—"}
-                        </span>
-                      </div>
-
-                      {/* Stats row */}
-                      <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
-                        <div style={{ flex: 1, background: "rgba(80,130,180,0.08)", borderRadius: 8, padding: "8px 10px", textAlign: "center" }}>
-                          <div style={{ fontSize: 18, fontWeight: 700, color: "#5ab0f0" }}>{p.businesses_count || 0}</div>
-                          <div style={{ fontSize: 10, color: "#4a7090", marginTop: 2 }}>BUSINESSES</div>
+                        {/* Status + type */}
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+                          <span style={{
+                            fontSize: 11, fontWeight: 700, padding: "3px 10px", borderRadius: 20, letterSpacing: "0.06em", textTransform: "capitalize",
+                            background: p.status === "active" ? "rgba(40,180,80,0.12)" : "rgba(100,160,220,0.12)",
+                            color:      p.status === "active" ? "#35c060"              : "#5ab0f0",
+                          }}>{p.status || "active"}</span>
+                          <span style={{ fontSize: 12, color: "#5a8aaa", textTransform: "capitalize" }}>{p.type || "individual"}</span>
                         </div>
-                        <div style={{ flex: 1, background: "rgba(80,130,180,0.08)", borderRadius: 8, padding: "8px 10px", textAlign: "center" }}>
-                          <div style={{ fontSize: 18, fontWeight: 700, color: "#35c080" }}>{p.email ? "✓" : "—"}</div>
-                          <div style={{ fontSize: 10, color: "#4a7090", marginTop: 2 }}>CONTACT</div>
-                        </div>
-                      </div>
 
-                      {/* View button */}
-                      <button style={{
-                        marginTop: "auto", width: "100%", padding: "8px 0", borderRadius: 8,
-                        background: "rgba(80,160,230,0.1)", border: "1px solid rgba(80,160,230,0.25)",
-                        color: "#5ab0f0", fontSize: 13, fontWeight: 600, cursor: "pointer",
-                      }}>
-                        View →
-                      </button>
-                    </Card>
-                  ))}
+                        {/* Contact stat */}
+                        <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
+                          <div style={{ flex: 1, background: "rgba(80,130,180,0.08)", borderRadius: 8, padding: "8px 10px", textAlign: "center" }}>
+                            <div style={{ fontSize: 16, fontWeight: 700, color: "#35c080" }}>{p.email ? "✓" : "—"}</div>
+                            <div style={{ fontSize: 10, color: "#4a7090", marginTop: 2 }}>EMAIL</div>
+                          </div>
+                          <div style={{ flex: 1, background: "rgba(80,130,180,0.08)", borderRadius: 8, padding: "8px 10px", textAlign: "center" }}>
+                            <div style={{ fontSize: 16, fontWeight: 700, color: "#5ab0f0" }}>{p.phone ? "✓" : "—"}</div>
+                            <div style={{ fontSize: 10, color: "#4a7090", marginTop: 2 }}>PHONE</div>
+                          </div>
+                        </div>
+                      </Card>
+                    );
+                  })}
                 </div>
               )}
             </div>

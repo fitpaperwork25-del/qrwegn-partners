@@ -200,7 +200,7 @@ export default function AdminDashboard({ navigate }) {
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
               <thead>
                 <tr style={{ borderBottom: "1px solid rgba(100,160,220,0.35)" }}>
-                  {["Business", "Owner", "Phone", "Country", "Notes", "Status", "Follow-up", "Submitted by", "Date"].map(h => (
+                  {["Business", "Owner", "Phone", "Country", "Notes", "Status", "Follow-up", "Plan", "Price", "Submitted by", "Date"].map(h => (
                     <th key={h} style={{ padding: "10px 14px", textAlign: "left", fontSize: 11, color: "#a0c8e8", fontWeight: 700, letterSpacing: "0.08em", whiteSpace: "nowrap" }}>
                       {h.toUpperCase()}
                     </th>
@@ -260,6 +260,68 @@ export default function AdminDashboard({ navigate }) {
                           cursor: "pointer",
                         }}
                       />
+                    </td>
+                    <td style={{ padding: "12px 14px" }}>
+                      <select
+                        value={l.plan || ""}
+                        onChange={e => updateLead(l.id, { plan: e.target.value || null })}
+                        style={{
+                          background: "rgba(10,20,45,0.9)",
+                          color: "#a0c8e8",
+                          border: "1px solid rgba(100,160,220,0.3)",
+                          borderRadius: 12,
+                          padding: "3px 8px",
+                          fontSize: 11,
+                          fontWeight: 700,
+                          letterSpacing: "0.06em",
+                          cursor: "pointer",
+                          outline: "none",
+                        }}
+                      >
+                        <option value="" style={{ background: "#0a1428", color: "#e0f0ff" }}>—</option>
+                        {["Starter", "Pro", "Enterprise"].map(p => (
+                          <option key={p} value={p} style={{ background: "#0a1428", color: "#e0f0ff" }}>{p}</option>
+                        ))}
+                      </select>
+                    </td>
+                    <td style={{ padding: "12px 14px" }}>
+                      <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                        <select
+                          value={l.currency || "USD"}
+                          onChange={e => updateLead(l.id, { currency: e.target.value })}
+                          style={{
+                            background: "rgba(10,20,45,0.9)",
+                            color: "#a0c8e8",
+                            border: "1px solid rgba(100,160,220,0.3)",
+                            borderRadius: 8,
+                            padding: "3px 5px",
+                            fontSize: 11,
+                            fontWeight: 700,
+                            cursor: "pointer",
+                            outline: "none",
+                          }}
+                        >
+                          {["USD", "EUR", "GBP", "ETB", "SSP", "KES", "NGN"].map(c => (
+                            <option key={c} value={c} style={{ background: "#0a1428", color: "#e0f0ff" }}>{c}</option>
+                          ))}
+                        </select>
+                        <input
+                          type="number"
+                          placeholder="0"
+                          value={l.monthly_value ?? ""}
+                          onChange={e => updateLead(l.id, { monthly_value: e.target.value === "" ? null : Number(e.target.value) })}
+                          style={{
+                            background: "rgba(10,20,45,0.9)",
+                            color: "#a0c8e8",
+                            border: "1px solid rgba(100,160,220,0.25)",
+                            borderRadius: 8,
+                            padding: "3px 7px",
+                            fontSize: 12,
+                            outline: "none",
+                            width: 70,
+                          }}
+                        />
+                      </div>
                     </td>
                     <td style={{ padding: "12px 14px", fontSize: 13, color: "#5ab0f0", whiteSpace: "nowrap" }}>{l.submitted_by_partner?.full_name || "—"}</td>
                     <td style={{ padding: "12px 14px", fontSize: 13, color: "#7ab0cc", whiteSpace: "nowrap" }}>{fmtDate(l.created_at)}</td>

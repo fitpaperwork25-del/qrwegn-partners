@@ -131,7 +131,7 @@ export default function AdminDashboard({ navigate }) {
             letterSpacing: "-1px",
           }}
         >
-          Partner Dashboard
+          Dashboard
         </h1>
 
         <p
@@ -144,7 +144,7 @@ export default function AdminDashboard({ navigate }) {
             textShadow: "0 3px 12px rgba(0,0,0,0.55)",
           }}
         >
-          Overview of your partner pipeline and activity
+          Overview of your sales pipeline and network
         </p>
       </div>
 

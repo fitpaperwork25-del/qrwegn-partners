@@ -33,12 +33,15 @@ const StageBadge = ({ stage }) => {
   );
 };
 
+const LEAD_STAGES = ["new", "contacted", "demo", "signed", "active", "churned"];
+
 const LEAD_STATUS_COLORS = {
   new:       { color: "#5ab0f0", bg: "rgba(100,160,220,0.18)" },
-  contacted: { color: "#5aaae0", bg: "rgba(120,180,240,0.12)" },
-  qualified: { color: "#35c080", bg: "rgba(80,180,140,0.12)" },
-  closed:    { color: "#35c060", bg: "rgba(40,180,80,0.12)" },
-  rejected:  { color: "#f07070", bg: "rgba(220,80,80,0.12)" },
+  contacted: { color: "#38d4e8", bg: "rgba(56,212,232,0.12)" },
+  demo:      { color: "#c080f0", bg: "rgba(160,100,220,0.14)" },
+  signed:    { color: "#f0c040", bg: "rgba(240,180,60,0.14)" },
+  active:    { color: "#35c060", bg: "rgba(40,180,80,0.12)" },
+  churned:   { color: "#909090", bg: "rgba(140,140,140,0.12)" },
 };
 
 const LeadStatusBadge = ({ status }) => {
@@ -62,6 +65,12 @@ export default function AdminDashboard({ navigate }) {
   const [partners, setPartners] = useState([]);
   const [leads,    setLeads]    = useState([]);
   const [loading,  setLoading]  = useState(true);
+
+  const updateLead = async (id, patch) => {
+    const { error } = await supabase.from("leads").update(patch).eq("id", id);
+    if (error) { console.error("updateLead error:", error); return; }
+    setLeads(ls => ls.map(l => l.id === id ? { ...l, ...patch } : l));
+  };
 
   useEffect(() => {
     // Partners unblocks the dashboard render; races against 2.5s so setLoading(false)
@@ -190,7 +199,7 @@ export default function AdminDashboard({ navigate }) {
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
               <thead>
                 <tr style={{ borderBottom: "1px solid rgba(100,160,220,0.35)" }}>
-                  {["Business", "Owner", "Phone", "Country", "Notes", "Status", "Submitted by", "Date"].map(h => (
+                  {["Business", "Owner", "Phone", "Country", "Notes", "Status", "Follow-up", "Submitted by", "Date"].map(h => (
                     <th key={h} style={{ padding: "10px 14px", textAlign: "left", fontSize: 11, color: "#a0c8e8", fontWeight: 700, letterSpacing: "0.08em", whiteSpace: "nowrap" }}>
                       {h.toUpperCase()}
                     </th>
@@ -211,7 +220,46 @@ export default function AdminDashboard({ navigate }) {
                     <td style={{ padding: "12px 14px", fontSize: 13, color: "#7ab0cc", maxWidth: 220 }}>
                       {l.notes ? (l.notes.length > 60 ? l.notes.slice(0, 60) + "…" : l.notes) : "—"}
                     </td>
-                    <td style={{ padding: "12px 14px" }}><LeadStatusBadge status={l.status} /></td>
+                    <td style={{ padding: "12px 14px" }}>
+                      <select
+                        value={l.status || "new"}
+                        onChange={e => updateLead(l.id, { status: e.target.value })}
+                        style={{
+                          background: "rgba(10,20,45,0.9)",
+                          color: (LEAD_STATUS_COLORS[l.status] || LEAD_STATUS_COLORS.new).color,
+                          border: "1px solid rgba(100,160,220,0.3)",
+                          borderRadius: 12,
+                          padding: "3px 8px",
+                          fontSize: 11,
+                          fontWeight: 700,
+                          letterSpacing: "0.06em",
+                          textTransform: "uppercase",
+                          cursor: "pointer",
+                          outline: "none",
+                        }}
+                      >
+                        {LEAD_STAGES.map(s => (
+                          <option key={s} value={s} style={{ background: "#0a1428", color: "#e0f0ff" }}>{s}</option>
+                        ))}
+                      </select>
+                    </td>
+                    <td style={{ padding: "12px 14px" }}>
+                      <input
+                        type="date"
+                        value={l.follow_up_date || ""}
+                        onChange={e => updateLead(l.id, { follow_up_date: e.target.value || null })}
+                        style={{
+                          background: "rgba(10,20,45,0.9)",
+                          color: "#a0c8e8",
+                          border: "1px solid rgba(100,160,220,0.25)",
+                          borderRadius: 8,
+                          padding: "3px 7px",
+                          fontSize: 12,
+                          outline: "none",
+                          cursor: "pointer",
+                        }}
+                      />
+                    </td>
                     <td style={{ padding: "12px 14px", fontSize: 13, color: "#5ab0f0", whiteSpace: "nowrap" }}>{l.submitted_by_partner?.full_name || "—"}</td>
                     <td style={{ padding: "12px 14px", fontSize: 13, color: "#7ab0cc", whiteSpace: "nowrap" }}>{fmtDate(l.created_at)}</td>
                   </tr>

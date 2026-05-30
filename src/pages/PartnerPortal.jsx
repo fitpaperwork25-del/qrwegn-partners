@@ -120,8 +120,20 @@ export default function PartnerPortal({ profile, onLogout }) {
     if (!lead.business_name.trim() || !profile?.id) return;
     setLeadSaving(true);
     setLeadError("");
+
+    // Fetch partner_id fresh so we never rely on potentially-stale state.
+    const { data: { user } } = await supabase.auth.getUser();
+    const { data: profileRow } = await supabase
+      .from("profiles").select("partner_id").eq("id", user.id).single();
+
+    if (!profileRow?.partner_id) {
+      setLeadSaving(false);
+      setLeadError("Your account isn't linked to a partner record. Contact admin.");
+      return;
+    }
+
     const { error } = await supabase.from("leads").insert({
-      submitted_by_partner_id: profile.partner_id,
+      submitted_by_partner_id: profileRow.partner_id,
       business_name: lead.business_name.trim(),
       contact_name: lead.owner_name.trim(),
       phone: lead.phone.trim(),

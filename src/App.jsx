@@ -53,12 +53,12 @@ export default function App() {
     setPage(userRole === "admin" ? "dashboard" : "partner-portal");
   };
 
-  const logout = async () => {
-    await supabase.auth.signOut();
+  const logout = () => {
     setRole(null);
     setProfile(null);
     setSelectedPartnerId(null);
     setPage("login");
+    supabase.auth.signOut().catch(e => console.warn("signOut error:", e));
   };
 
   if (page === "reset-password") return <ResetPasswordPage setPage={setPage} />;

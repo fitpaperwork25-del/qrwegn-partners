@@ -43,9 +43,6 @@ export default function LoginPage({ onLogin }) {
         return;
       }
 
-      const userRole = mode;
-      console.log("NAVIGATING as:", userRole);
-
       let profileData = null;
       try {
         const profileFetch = supabase
@@ -56,6 +53,9 @@ export default function LoginPage({ onLogin }) {
       } catch (profileErr) {
         console.warn("profiles fetch failed, proceeding without it:", profileErr);
       }
+
+      const userRole = profileData?.role || "partner";
+      console.log("NAVIGATING as:", userRole);
 
       if (!timedOut) {
         onLogin(userRole, { ...profileData, email: user.email, id: user.id });

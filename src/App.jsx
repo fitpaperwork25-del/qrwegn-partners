@@ -34,7 +34,7 @@ export default function App() {
         console.warn("session-restore profiles fetch failed:", e);
       }
 
-      const userRole = profileData?.role || "admin";
+      const userRole = profileData?.role || "partner";
       setRole(userRole);
       setProfile({ ...profileData, email: user.email, id: user.id });
       setPage(userRole === "admin" ? "dashboard" : "partner-portal");

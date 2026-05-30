@@ -82,7 +82,7 @@ export default function AdminDashboard({ navigate }) {
 
     // Leads loads independently — a slow query never delays the page.
     supabase.from("leads")
-      .select("*, partners(full_name)")
+      .select("*, submitted_by_partner:partners!leads_submitted_by_partner_id_fkey(full_name)")
       .order("created_at", { ascending: false })
       .then(({ data, error }) => {
         if (!error) setLeads(data || []);
@@ -212,7 +212,7 @@ export default function AdminDashboard({ navigate }) {
                       {l.notes ? (l.notes.length > 60 ? l.notes.slice(0, 60) + "…" : l.notes) : "—"}
                     </td>
                     <td style={{ padding: "12px 14px" }}><LeadStatusBadge status={l.status} /></td>
-                    <td style={{ padding: "12px 14px", fontSize: 13, color: "#5ab0f0", whiteSpace: "nowrap" }}>{l.partners?.full_name || "—"}</td>
+                    <td style={{ padding: "12px 14px", fontSize: 13, color: "#5ab0f0", whiteSpace: "nowrap" }}>{l.submitted_by_partner?.full_name || "—"}</td>
                     <td style={{ padding: "12px 14px", fontSize: 13, color: "#7ab0cc", whiteSpace: "nowrap" }}>{fmtDate(l.created_at)}</td>
                   </tr>
                 ))}

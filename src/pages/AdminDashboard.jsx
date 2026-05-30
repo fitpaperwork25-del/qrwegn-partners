@@ -62,9 +62,10 @@ function fmtDate(iso) {
 }
 
 export default function AdminDashboard({ navigate }) {
-  const [partners, setPartners] = useState([]);
-  const [leads,    setLeads]    = useState([]);
-  const [loading,  setLoading]  = useState(true);
+  const [partners,  setPartners]  = useState([]);
+  const [leads,     setLeads]     = useState([]);
+  const [promotors, setPromotors] = useState([]);
+  const [loading,   setLoading]   = useState(true);
 
   const updateLead = async (id, patch) => {
     const { error } = await supabase.from("leads").update(patch).eq("id", id);
@@ -96,18 +97,18 @@ export default function AdminDashboard({ navigate }) {
       .then(({ data, error }) => {
         if (!error) setLeads(data || []);
       });
+
+    supabase.from("promotors").select("*").then(({ data, error }) => {
+      if (!error) setPromotors(data || []);
+    });
   }, []);
 
-  const stageCounts = STAGES.reduce((acc, s) => {
-    acc[s] = partners.filter(p => p.stage === s).length;
+  const leadStageCounts = LEAD_STAGES.reduce((acc, s) => {
+    acc[s] = leads.filter(l => (l.status || "new") === s).length;
     return acc;
   }, {});
 
-  const activeCount     = stageCounts["Active"] || 0;
-  const onboardingCount = stageCounts["Onboarding"] || 0;
-  const stalledCount    = stageCounts["Stalled"] || 0;
-  const promotorCount   = partners.filter(p => p.parent_partner_id).length;
-  const recentPartners  = partners.slice(0, 5);
+  const recentPartners = partners.slice(0, 5);
 
   if (loading) return (
     <div style={{ textAlign: "center", padding: "80px 0", color: "#a0c8e8", fontSize: 18 }}>
@@ -150,11 +151,11 @@ export default function AdminDashboard({ navigate }) {
       {/* Metric row */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 14, marginBottom: 24 }}>
         {[
-          { label: "Total Partners", value: partners.length, sub: "in pipeline" },
-          { label: "Active",         value: activeCount,     sub: "onboarding businesses" },
-          { label: "Onboarding",     value: onboardingCount, sub: "nearly active" },
-          { label: "Stalled",        value: stalledCount,    sub: "need attention" },
-          { label: "My Promotors",   value: promotorCount,   sub: "sub-partners assigned" },
+          { label: "Total Restaurants", value: leads.length,                                      sub: "in pipeline" },
+          { label: "Signed",            value: leads.filter(l => l.status === "signed").length,   sub: "signed up" },
+          { label: "Active",            value: leads.filter(l => l.status === "active").length,   sub: "live" },
+          { label: "Partners",          value: partners.length,                                   sub: "regional partners" },
+          { label: "Promotors",         value: promotors.length,                                  sub: "in network" },
         ].map(m => (
           <Card key={m.label} style={{ padding: "16px 20px" }}>
             <div style={{ fontSize: 12, color: "#a0c8e8", letterSpacing: "0.06em", marginBottom: 6, fontWeight: 600 }}>{m.label.toUpperCase()}</div>
@@ -168,16 +169,16 @@ export default function AdminDashboard({ navigate }) {
       <Card style={{ marginBottom: 24 }}>
         <div style={{ fontSize: 18, fontWeight: 600, color: "#a0c8e8", letterSpacing: "0.08em", marginBottom: 16 }}>PIPELINE OVERVIEW</div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          {STAGES.map(s => {
-            const c = STAGE_COLORS[s];
-            const count = stageCounts[s] || 0;
+          {LEAD_STAGES.map(s => {
+            const c = LEAD_STATUS_COLORS[s];
+            const count = leadStageCounts[s] || 0;
             return (
               <div key={s} style={{
                 background: c.bg, borderRadius: 10, padding: "10px 14px",
                 display: "flex", flexDirection: "column", alignItems: "center", minWidth: 80, flex: 1
               }}>
                 <div style={{ fontSize: 26, fontWeight: 700, color: c.color }}>{count}</div>
-                <div style={{ fontSize: 17, color: c.color, opacity: 0.8, textAlign: "center", marginTop: 2 }}>{s}</div>
+                <div style={{ fontSize: 17, color: c.color, opacity: 0.8, textAlign: "center", marginTop: 2, textTransform: "capitalize" }}>{s}</div>
               </div>
             );
           })}
@@ -274,14 +275,14 @@ export default function AdminDashboard({ navigate }) {
         {/* Stage breakdown */}
         <Card>
           <div style={{ fontSize: 18, fontWeight: 600, color: "#a0c8e8", letterSpacing: "0.08em", marginBottom: 16 }}>STAGE BREAKDOWN</div>
-          {STAGES.filter(s => stageCounts[s] > 0).map(s => {
-            const c = STAGE_COLORS[s];
-            const count = stageCounts[s];
-            const pct = partners.length > 0 ? Math.round(count / partners.length * 100) : 0;
+          {LEAD_STAGES.filter(s => leadStageCounts[s] > 0).map(s => {
+            const c = LEAD_STATUS_COLORS[s];
+            const count = leadStageCounts[s];
+            const pct = leads.length > 0 ? Math.round(count / leads.length * 100) : 0;
             return (
               <div key={s} style={{ marginBottom: 12 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
-                  <span style={{ fontSize: 15, color: c.color, fontWeight: 500 }}>{s}</span>
+                  <span style={{ fontSize: 15, color: c.color, fontWeight: 500, textTransform: "capitalize" }}>{s}</span>
                   <span style={{ fontSize: 15, color: "#7ab0cc" }}>{count} ({pct}%)</span>
                 </div>
                 <div style={{ height: 6, background: "rgba(100,160,220,0.12)", borderRadius: 3, overflow: "hidden" }}>
@@ -290,8 +291,8 @@ export default function AdminDashboard({ navigate }) {
               </div>
             );
           })}
-          {partners.length === 0 && (
-            <p style={{ fontSize: 16, color: "#7ab0cc", textAlign: "center", padding: "20px 0" }}>No partners yet</p>
+          {leads.length === 0 && (
+            <p style={{ fontSize: 16, color: "#7ab0cc", textAlign: "center", padding: "20px 0" }}>No leads yet.</p>
           )}
         </Card>
 

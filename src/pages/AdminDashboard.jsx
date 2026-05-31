@@ -525,6 +525,98 @@ export default function AdminDashboard({ navigate }) {
         )}
       </Card>
 
+      {/* Earnings & Balances */}
+      {(() => {
+        const EARNING_STATUSES = ["signed", "active"];
+        const map = {};
+
+        const upsert = (key, init) => { if (!map[key]) map[key] = { ...init, owed: 0, paid: 0 }; };
+
+        promotors.forEach(pr => {
+          leads.forEach(l => {
+            if (l.submitted_by_promotor_id !== pr.id) return;
+            if (!EARNING_STATUSES.includes(l.status)) return;
+            if (l.monthly_value == null || l.promotor_pct == null) return;
+            const cur = l.currency || "USD";
+            const key = `promotor:${pr.id}:${cur}`;
+            upsert(key, { name: pr.full_name, type: "promotor", currency: cur });
+            map[key].owed += l.monthly_value * l.promotor_pct / 100;
+          });
+        });
+
+        partners.forEach(pa => {
+          leads.forEach(l => {
+            if (l.regional_partner_id !== pa.id) return;
+            if (!EARNING_STATUSES.includes(l.status)) return;
+            if (l.monthly_value == null || l.partner_pct == null) return;
+            const cur = l.currency || "USD";
+            const key = `partner:${pa.id}:${cur}`;
+            upsert(key, { name: pa.full_name, type: "partner", currency: cur });
+            map[key].owed += l.monthly_value * l.partner_pct / 100;
+          });
+        });
+
+        payouts.forEach(p => {
+          if (!p.beneficiary_type || !p.beneficiary_id) return;
+          const cur = p.currency || "USD";
+          const key = `${p.beneficiary_type}:${p.beneficiary_id}:${cur}`;
+          if (!map[key]) {
+            const allPeople = [
+              ...promotors.map(pr => ({ type: "promotor", id: pr.id, name: pr.full_name })),
+              ...partners.map(pa => ({ type: "partner", id: pa.id, name: pa.full_name })),
+            ];
+            const match = allPeople.find(x => x.type === p.beneficiary_type && String(x.id) === String(p.beneficiary_id));
+            upsert(key, { name: match?.name || p.beneficiary, type: p.beneficiary_type, currency: cur });
+          }
+          map[key].paid += Number(p.amount);
+        });
+
+        const rows = Object.values(map).sort((a, b) => a.name.localeCompare(b.name));
+
+        return (
+          <Card style={{ marginBottom: 24 }}>
+            <div style={{ fontSize: 18, fontWeight: 600, color: "#a0c8e8", letterSpacing: "0.08em", marginBottom: 16 }}>EARNINGS & BALANCES</div>
+            {rows.length === 0 ? (
+              <p style={{ fontSize: 15, color: "#5a7a90", textAlign: "center", padding: "16px 0" }}>No earnings yet.</p>
+            ) : (
+              <div style={{ overflowX: "auto" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                  <thead>
+                    <tr style={{ borderBottom: "1px solid rgba(100,160,220,0.35)" }}>
+                      {["Person", "Role", "Currency", "Owed", "Paid", "Balance"].map(h => (
+                        <th key={h} style={{ padding: "8px 14px", textAlign: "left", fontSize: 11, color: "#a0c8e8", fontWeight: 700, letterSpacing: "0.08em", whiteSpace: "nowrap" }}>
+                          {h.toUpperCase()}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rows.map((r, i) => {
+                      const balance = r.owed - r.paid;
+                      const balanceColor = balance > 0 ? "#e8c547" : "#7ac77a";
+                      return (
+                        <tr key={`${r.type}:${r.name}:${r.currency}`}
+                          style={{ borderBottom: i < rows.length - 1 ? "1px solid rgba(100,160,220,0.14)" : "none" }}
+                          onMouseEnter={e => e.currentTarget.style.background = "rgba(100,160,220,0.04)"}
+                          onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+                        >
+                          <td style={{ padding: "10px 14px", fontSize: 14, fontWeight: 600, color: "#ffffff" }}>{r.name}</td>
+                          <td style={{ padding: "10px 14px", fontSize: 13, color: "#7ab0cc", textTransform: "capitalize" }}>{r.type}</td>
+                          <td style={{ padding: "10px 14px", fontSize: 13, color: "#7ab0cc" }}>{r.currency}</td>
+                          <td style={{ padding: "10px 14px", fontSize: 13, color: "#a0c8e8", whiteSpace: "nowrap" }}>{r.currency} {r.owed.toFixed(2)}</td>
+                          <td style={{ padding: "10px 14px", fontSize: 13, color: "#a0c8e8", whiteSpace: "nowrap" }}>{r.currency} {r.paid.toFixed(2)}</td>
+                          <td style={{ padding: "10px 14px", fontSize: 14, fontWeight: 700, color: balanceColor, whiteSpace: "nowrap" }}>{r.currency} {balance.toFixed(2)}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </Card>
+        );
+      })()}
+
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
         {/* Stage breakdown */}
         <Card>

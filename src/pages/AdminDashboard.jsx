@@ -65,11 +65,13 @@ export default function AdminDashboard({ navigate }) {
   const [partners,  setPartners]  = useState([]);
   const [leads,     setLeads]     = useState([]);
   const [promotors, setPromotors] = useState([]);
-  const [payouts,   setPayouts]   = useState([]);
-  const [loading,   setLoading]   = useState(true);
+  const [payouts,    setPayouts]    = useState([]);
+  const [demoLinks,  setDemoLinks]  = useState([]);
+  const [loading,    setLoading]    = useState(true);
 
   const today = new Date().toISOString().slice(0, 10);
-  const [payoutForm, setPayoutForm] = useState({ beneficiary: "", beneficiary_type: "", beneficiary_id: "", amount: "", currency: "USD", paid_on: today, note: "" });
+  const [payoutForm,   setPayoutForm]   = useState({ beneficiary: "", beneficiary_type: "", beneficiary_id: "", amount: "", currency: "USD", paid_on: today, note: "" });
+  const [demoLinkForm, setDemoLinkForm] = useState({ name: "", url: "", description: "" });
 
   const updateLead = async (id, patch) => {
     const { error } = await supabase.from("leads").update(patch).eq("id", id);
@@ -109,12 +111,40 @@ export default function AdminDashboard({ navigate }) {
     supabase.from("payouts").select("*").order("paid_on", { ascending: false }).then(({ data, error }) => {
       if (!error) setPayouts(data || []);
     });
+
+    supabase.from("demo_links").select("*").order("created_at", { ascending: false }).then(({ data, error }) => {
+      if (!error) setDemoLinks(data || []);
+    });
   }, []);
 
   const fetchPayouts = () =>
     supabase.from("payouts").select("*").order("paid_on", { ascending: false }).then(({ data, error }) => {
       if (!error) setPayouts(data || []);
     });
+
+  const fetchDemoLinks = () =>
+    supabase.from("demo_links").select("*").order("created_at", { ascending: false }).then(({ data, error }) => {
+      if (!error) setDemoLinks(data || []);
+    });
+
+  const addDemoLink = async () => {
+    if (!demoLinkForm.name.trim() || !demoLinkForm.url.trim()) return;
+    const { error } = await supabase.from("demo_links").insert({
+      name: demoLinkForm.name.trim(),
+      url: demoLinkForm.url.trim(),
+      description: demoLinkForm.description.trim() || null,
+    });
+    if (error) { console.error("addDemoLink error:", error); return; }
+    await fetchDemoLinks();
+    setDemoLinkForm({ name: "", url: "", description: "" });
+  };
+
+  const deleteDemoLink = async (id) => {
+    if (!window.confirm("Delete this demo link?")) return;
+    const { error } = await supabase.from("demo_links").delete().eq("id", id);
+    if (error) { console.error("deleteDemoLink error:", error); return; }
+    await fetchDemoLinks();
+  };
 
   const recordPayout = async () => {
     if (!payoutForm.beneficiary_id || !payoutForm.amount) return;
@@ -616,6 +646,79 @@ export default function AdminDashboard({ navigate }) {
           </Card>
         );
       })()}
+
+      {/* Demo Links */}
+      <Card style={{ marginBottom: 24 }}>
+        <div style={{ fontSize: 18, fontWeight: 600, color: "#a0c8e8", letterSpacing: "0.08em", marginBottom: 16 }}>DEMO LINKS</div>
+
+        {/* Add form */}
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "flex-end", marginBottom: 20 }}>
+          <input
+            placeholder="Name"
+            value={demoLinkForm.name}
+            onChange={e => setDemoLinkForm(f => ({ ...f, name: e.target.value }))}
+            style={{ background: "rgba(10,20,45,0.9)", color: "#a0c8e8", border: "1px solid rgba(100,160,220,0.25)", borderRadius: 8, padding: "5px 10px", fontSize: 13, outline: "none", width: 130 }}
+          />
+          <input
+            placeholder="URL"
+            value={demoLinkForm.url}
+            onChange={e => setDemoLinkForm(f => ({ ...f, url: e.target.value }))}
+            style={{ background: "rgba(10,20,45,0.9)", color: "#a0c8e8", border: "1px solid rgba(100,160,220,0.25)", borderRadius: 8, padding: "5px 10px", fontSize: 13, outline: "none", width: 220 }}
+          />
+          <input
+            placeholder="Description (optional)"
+            value={demoLinkForm.description}
+            onChange={e => setDemoLinkForm(f => ({ ...f, description: e.target.value }))}
+            style={{ background: "rgba(10,20,45,0.9)", color: "#a0c8e8", border: "1px solid rgba(100,160,220,0.25)", borderRadius: 8, padding: "5px 10px", fontSize: 13, outline: "none", width: 200 }}
+          />
+          <button
+            onClick={addDemoLink}
+            style={{ background: "#1a4080", color: "#a0c8e8", border: "1px solid rgba(100,160,220,0.4)", borderRadius: 8, padding: "5px 16px", fontSize: 13, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}
+          >
+            Add demo link
+          </button>
+        </div>
+
+        {/* Table */}
+        {demoLinks.length === 0 ? (
+          <p style={{ fontSize: 15, color: "#5a7a90", textAlign: "center", padding: "16px 0" }}>No demo links yet.</p>
+        ) : (
+          <div style={{ overflowX: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+              <thead>
+                <tr style={{ borderBottom: "1px solid rgba(100,160,220,0.35)" }}>
+                  {["Name", "Link", "Description", ""].map(h => (
+                    <th key={h} style={{ padding: "8px 14px", textAlign: "left", fontSize: 11, color: "#a0c8e8", fontWeight: 700, letterSpacing: "0.08em", whiteSpace: "nowrap" }}>
+                      {h.toUpperCase()}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {demoLinks.map((d, i) => (
+                  <tr key={d.id}
+                    style={{ borderBottom: i < demoLinks.length - 1 ? "1px solid rgba(100,160,220,0.14)" : "none" }}
+                    onMouseEnter={e => e.currentTarget.style.background = "rgba(100,160,220,0.04)"}
+                    onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+                  >
+                    <td style={{ padding: "10px 14px", fontSize: 14, fontWeight: 600, color: "#ffffff" }}>{d.name}</td>
+                    <td style={{ padding: "10px 14px", whiteSpace: "nowrap" }}>
+                      <a href={d.url} target="_blank" rel="noreferrer" style={{ fontSize: 13, color: "#5ab0f0", textDecoration: "none", fontWeight: 600 }}>Open ↗</a>
+                    </td>
+                    <td style={{ padding: "10px 14px", fontSize: 13, color: "#7ab0cc" }}>{d.description || "—"}</td>
+                    <td style={{ padding: "10px 14px" }}>
+                      <button
+                        onClick={() => deleteDemoLink(d.id)}
+                        style={{ background: "rgba(30,10,10,0.7)", color: "#e88a8a", border: "1px solid rgba(220,100,100,0.25)", borderRadius: 7, padding: "3px 10px", fontSize: 11, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}
+                      >Delete</button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Card>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
         {/* Stage breakdown */}

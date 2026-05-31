@@ -130,6 +130,13 @@ export default function AdminDashboard({ navigate }) {
     setPayoutForm({ beneficiary: "", amount: "", currency: "USD", paid_on: today, note: "" });
   };
 
+  const deletePayout = async (id) => {
+    if (!window.confirm("Delete this payout?")) return;
+    const { error } = await supabase.from("payouts").delete().eq("id", id);
+    if (error) { console.error("deletePayout error:", error); return; }
+    await fetchPayouts();
+  };
+
   const leadStageCounts = LEAD_STAGES.reduce((acc, s) => {
     acc[s] = leads.filter(l => (l.status || "new") === s).length;
     return acc;
@@ -464,7 +471,7 @@ export default function AdminDashboard({ navigate }) {
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
               <thead>
                 <tr style={{ borderBottom: "1px solid rgba(100,160,220,0.35)" }}>
-                  {["Beneficiary", "Amount", "Paid on", "Note"].map(h => (
+                  {["Beneficiary", "Amount", "Paid on", "Note", ""].map(h => (
                     <th key={h} style={{ padding: "8px 14px", textAlign: "left", fontSize: 11, color: "#a0c8e8", fontWeight: 700, letterSpacing: "0.08em", whiteSpace: "nowrap" }}>
                       {h.toUpperCase()}
                     </th>
@@ -482,6 +489,12 @@ export default function AdminDashboard({ navigate }) {
                     <td style={{ padding: "10px 14px", fontSize: 14, color: "#a0c8e8", whiteSpace: "nowrap" }}>{p.currency} {Number(p.amount).toLocaleString()}</td>
                     <td style={{ padding: "10px 14px", fontSize: 13, color: "#7ab0cc", whiteSpace: "nowrap" }}>{fmtDate(p.paid_on)}</td>
                     <td style={{ padding: "10px 14px", fontSize: 13, color: "#7ab0cc" }}>{p.note || "—"}</td>
+                    <td style={{ padding: "10px 14px" }}>
+                      <button
+                        onClick={() => deletePayout(p.id)}
+                        style={{ background: "rgba(30,10,10,0.7)", color: "#e88a8a", border: "1px solid rgba(220,100,100,0.25)", borderRadius: 7, padding: "3px 10px", fontSize: 11, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}
+                      >Delete</button>
+                    </td>
                   </tr>
                 ))}
               </tbody>

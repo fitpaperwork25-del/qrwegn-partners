@@ -69,7 +69,7 @@ export default function AdminDashboard({ navigate }) {
   const [loading,   setLoading]   = useState(true);
 
   const today = new Date().toISOString().slice(0, 10);
-  const [payoutForm, setPayoutForm] = useState({ beneficiary: "", amount: "", currency: "USD", paid_on: today, note: "" });
+  const [payoutForm, setPayoutForm] = useState({ beneficiary: "", beneficiary_type: "", beneficiary_id: "", amount: "", currency: "USD", paid_on: today, note: "" });
 
   const updateLead = async (id, patch) => {
     const { error } = await supabase.from("leads").update(patch).eq("id", id);
@@ -117,9 +117,11 @@ export default function AdminDashboard({ navigate }) {
     });
 
   const recordPayout = async () => {
-    if (!payoutForm.beneficiary.trim() || !payoutForm.amount) return;
+    if (!payoutForm.beneficiary_id || !payoutForm.amount) return;
     const { error } = await supabase.from("payouts").insert({
-      beneficiary: payoutForm.beneficiary.trim(),
+      beneficiary: payoutForm.beneficiary,
+      beneficiary_type: payoutForm.beneficiary_type,
+      beneficiary_id: payoutForm.beneficiary_id,
       amount: Number(payoutForm.amount),
       currency: payoutForm.currency,
       paid_on: payoutForm.paid_on,
@@ -127,7 +129,7 @@ export default function AdminDashboard({ navigate }) {
     });
     if (error) { console.error("recordPayout error:", error); return; }
     await fetchPayouts();
-    setPayoutForm({ beneficiary: "", amount: "", currency: "USD", paid_on: today, note: "" });
+    setPayoutForm({ beneficiary: "", beneficiary_type: "", beneficiary_id: "", amount: "", currency: "USD", paid_on: today, note: "" });
   };
 
   const deletePayout = async (id) => {
@@ -421,12 +423,32 @@ export default function AdminDashboard({ navigate }) {
 
         {/* Record payout form */}
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "flex-end", marginBottom: 20 }}>
-          <input
-            placeholder="Beneficiary"
-            value={payoutForm.beneficiary}
-            onChange={e => setPayoutForm(f => ({ ...f, beneficiary: e.target.value }))}
-            style={{ background: "rgba(10,20,45,0.9)", color: "#a0c8e8", border: "1px solid rgba(100,160,220,0.25)", borderRadius: 8, padding: "5px 10px", fontSize: 13, outline: "none", width: 150 }}
-          />
+          <select
+            value={payoutForm.beneficiary_id ? `${payoutForm.beneficiary_type}:${payoutForm.beneficiary_id}` : ""}
+            onChange={e => {
+              const val = e.target.value;
+              if (!val) {
+                setPayoutForm(f => ({ ...f, beneficiary: "", beneficiary_type: "", beneficiary_id: "" }));
+                return;
+              }
+              const [type, id] = val.split(":");
+              const people = [
+                ...promotors.map(p => ({ type: "promotor", id: p.id, name: p.full_name })),
+                ...partners.map(p => ({ type: "partner", id: p.id, name: p.full_name })),
+              ];
+              const match = people.find(p => p.type === type && String(p.id) === id);
+              setPayoutForm(f => ({ ...f, beneficiary: match?.name || "", beneficiary_type: type, beneficiary_id: id }));
+            }}
+            style={{ background: "rgba(10,20,45,0.9)", color: "#a0c8e8", border: "1px solid rgba(100,160,220,0.3)", borderRadius: 8, padding: "5px 7px", fontSize: 13, fontWeight: 700, cursor: "pointer", outline: "none", minWidth: 180 }}
+          >
+            <option value="" style={{ background: "#0a1428", color: "#e0f0ff" }}>Select person</option>
+            {promotors.map(p => (
+              <option key={`promotor:${p.id}`} value={`promotor:${p.id}`} style={{ background: "#0a1428", color: "#e0f0ff" }}>{p.full_name} (promotor)</option>
+            ))}
+            {partners.map(p => (
+              <option key={`partner:${p.id}`} value={`partner:${p.id}`} style={{ background: "#0a1428", color: "#e0f0ff" }}>{p.full_name} (partner)</option>
+            ))}
+          </select>
           <input
             type="number"
             placeholder="Amount"

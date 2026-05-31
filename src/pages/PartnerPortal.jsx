@@ -105,8 +105,9 @@ export default function PartnerPortal({ profile, onLogout }) {
   const [showRecruitForm, setShowRecruitForm] = useState(false);
   const [myLeads,         setMyLeads]         = useState([]);
   const [myPayouts,       setMyPayouts]       = useState([]);
+  const [demoLinks,       setDemoLinks]       = useState([]);
 
-  useEffect(() => { init(); loadPromotors(); loadMyLeads(); loadMyPayouts(); }, []);
+  useEffect(() => { init(); loadPromotors(); loadMyLeads(); loadMyPayouts(); loadDemoLinks(); }, []);
 
   const init = () => {
     setChecklist(DEFAULT_CHECKLIST.map(item => ({ ...item, done: false })));
@@ -122,6 +123,12 @@ export default function PartnerPortal({ profile, onLogout }) {
   const loadMyPayouts = () => {
     supabase.from("payouts").select("*").order("paid_on", { ascending: false }).then(({ data, error }) => {
       if (!error) setMyPayouts(data || []);
+    });
+  };
+
+  const loadDemoLinks = () => {
+    supabase.from("demo_links").select("*").order("created_at", { ascending: false }).then(({ data, error }) => {
+      if (!error) setDemoLinks(data || []);
     });
   };
 
@@ -352,6 +359,21 @@ export default function PartnerPortal({ profile, onLogout }) {
               </Card>
             );
           })()}
+          <Card style={{ marginBottom: 16 }}>
+            <SectionLabel>DEMO LINKS</SectionLabel>
+            <p style={{ fontSize: 13, color: "#4a7090", marginTop: -8, marginBottom: 14 }}>Open or share these with prospects.</p>
+            {demoLinks.length === 0 ? (
+              <p style={{ fontSize: 14, color: "#3a5a70", margin: 0 }}>No demos available yet.</p>
+            ) : demoLinks.map(d => (
+              <div key={d.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 0", borderBottom: "1px solid rgba(50,80,140,0.18)", gap: 12 }}>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: "#c0d8e8" }}>{d.name}</div>
+                  {d.description && <div style={{ fontSize: 12, color: "#4a7090", marginTop: 2 }}>{d.description}</div>}
+                </div>
+                <a href={d.url} target="_blank" rel="noreferrer" style={{ fontSize: 13, color: "#5ab0f0", textDecoration: "none", fontWeight: 600, whiteSpace: "nowrap", flexShrink: 0 }}>Open ↗</a>
+              </div>
+            ))}
+          </Card>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 16 }}>
             <Card>
               <SectionLabel>ONBOARDING CHECKLIST</SectionLabel>

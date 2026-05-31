@@ -54,6 +54,7 @@ export default function PromotorPortal({ profile, onLogout }) {
   const [leadsLoading, setLeadsLoading] = useState(false);
   const [leadsLoaded,  setLeadsLoaded] = useState(false);
   const [myPayouts,    setMyPayouts]   = useState([]);
+  const [demoLinks,    setDemoLinks]   = useState([]);
 
   const initials  = profile?.full_name
     ? profile.full_name.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase()
@@ -66,6 +67,9 @@ export default function PromotorPortal({ profile, onLogout }) {
     });
     supabase.from("payouts").select("*").order("paid_on", { ascending: false }).then(({ data, error }) => {
       if (!error) setMyPayouts(data || []);
+    });
+    supabase.from("demo_links").select("*").order("created_at", { ascending: false }).then(({ data, error }) => {
+      if (!error) setDemoLinks(data || []);
     });
   }, []);
 
@@ -219,6 +223,21 @@ export default function PromotorPortal({ profile, onLogout }) {
                 </Card>
               );
             })()}
+            <Card>
+              <SectionLabel>DEMO LINKS</SectionLabel>
+              <p style={{ fontSize: 13, color: "#4a7090", marginTop: -8, marginBottom: 14 }}>Open or share these with prospects.</p>
+              {demoLinks.length === 0 ? (
+                <p style={{ fontSize: 14, color: "#3a5a70", margin: 0 }}>No demos available yet.</p>
+              ) : demoLinks.map(d => (
+                <div key={d.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 0", borderBottom: "1px solid rgba(50,80,140,0.18)", gap: 12 }}>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: "#c0d8e8" }}>{d.name}</div>
+                    {d.description && <div style={{ fontSize: 12, color: "#4a7090", marginTop: 2 }}>{d.description}</div>}
+                  </div>
+                  <a href={d.url} target="_blank" rel="noreferrer" style={{ fontSize: 13, color: "#5ab0f0", textDecoration: "none", fontWeight: 600, whiteSpace: "nowrap", flexShrink: 0 }}>Open ↗</a>
+                </div>
+              ))}
+            </Card>
             <Card>
               <SectionLabel>WELCOME</SectionLabel>
               <p style={{ fontSize: 15, color: "#b0cce0", margin: "0 0 10px", lineHeight: 1.6 }}>

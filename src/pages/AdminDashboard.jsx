@@ -65,7 +65,11 @@ export default function AdminDashboard({ navigate }) {
   const [partners,  setPartners]  = useState([]);
   const [leads,     setLeads]     = useState([]);
   const [promotors, setPromotors] = useState([]);
+  const [payouts,   setPayouts]   = useState([]);
   const [loading,   setLoading]   = useState(true);
+
+  const today = new Date().toISOString().slice(0, 10);
+  const [payoutForm, setPayoutForm] = useState({ beneficiary: "", amount: "", currency: "USD", paid_on: today, note: "" });
 
   const updateLead = async (id, patch) => {
     const { error } = await supabase.from("leads").update(patch).eq("id", id);
@@ -101,7 +105,30 @@ export default function AdminDashboard({ navigate }) {
     supabase.from("promotors").select("*").then(({ data, error }) => {
       if (!error) setPromotors(data || []);
     });
+
+    supabase.from("payouts").select("*").order("paid_on", { ascending: false }).then(({ data, error }) => {
+      if (!error) setPayouts(data || []);
+    });
   }, []);
+
+  const fetchPayouts = () =>
+    supabase.from("payouts").select("*").order("paid_on", { ascending: false }).then(({ data, error }) => {
+      if (!error) setPayouts(data || []);
+    });
+
+  const recordPayout = async () => {
+    if (!payoutForm.beneficiary.trim() || !payoutForm.amount) return;
+    const { error } = await supabase.from("payouts").insert({
+      beneficiary: payoutForm.beneficiary.trim(),
+      amount: Number(payoutForm.amount),
+      currency: payoutForm.currency,
+      paid_on: payoutForm.paid_on,
+      note: payoutForm.note.trim() || null,
+    });
+    if (error) { console.error("recordPayout error:", error); return; }
+    await fetchPayouts();
+    setPayoutForm({ beneficiary: "", amount: "", currency: "USD", paid_on: today, note: "" });
+  };
 
   const leadStageCounts = LEAD_STAGES.reduce((acc, s) => {
     acc[s] = leads.filter(l => (l.status || "new") === s).length;
@@ -373,6 +400,88 @@ export default function AdminDashboard({ navigate }) {
                     </td>
                     <td style={{ padding: "12px 14px", fontSize: 13, color: "#5ab0f0", whiteSpace: "nowrap" }}>{l.submitted_by_partner?.full_name || "—"}</td>
                     <td style={{ padding: "12px 14px", fontSize: 13, color: "#7ab0cc", whiteSpace: "nowrap" }}>{fmtDate(l.created_at)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Card>
+
+      {/* Payouts */}
+      <Card style={{ marginBottom: 24 }}>
+        <div style={{ fontSize: 18, fontWeight: 600, color: "#a0c8e8", letterSpacing: "0.08em", marginBottom: 16 }}>PAYOUTS</div>
+
+        {/* Record payout form */}
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "flex-end", marginBottom: 20 }}>
+          <input
+            placeholder="Beneficiary"
+            value={payoutForm.beneficiary}
+            onChange={e => setPayoutForm(f => ({ ...f, beneficiary: e.target.value }))}
+            style={{ background: "rgba(10,20,45,0.9)", color: "#a0c8e8", border: "1px solid rgba(100,160,220,0.25)", borderRadius: 8, padding: "5px 10px", fontSize: 13, outline: "none", width: 150 }}
+          />
+          <input
+            type="number"
+            placeholder="Amount"
+            value={payoutForm.amount}
+            onChange={e => setPayoutForm(f => ({ ...f, amount: e.target.value }))}
+            style={{ background: "rgba(10,20,45,0.9)", color: "#a0c8e8", border: "1px solid rgba(100,160,220,0.25)", borderRadius: 8, padding: "5px 10px", fontSize: 13, outline: "none", width: 100 }}
+          />
+          <select
+            value={payoutForm.currency}
+            onChange={e => setPayoutForm(f => ({ ...f, currency: e.target.value }))}
+            style={{ background: "rgba(10,20,45,0.9)", color: "#a0c8e8", border: "1px solid rgba(100,160,220,0.3)", borderRadius: 8, padding: "5px 7px", fontSize: 13, fontWeight: 700, cursor: "pointer", outline: "none" }}
+          >
+            {["USD", "EUR", "GBP", "ETB", "SSP", "KES", "NGN"].map(c => (
+              <option key={c} value={c} style={{ background: "#0a1428", color: "#e0f0ff" }}>{c}</option>
+            ))}
+          </select>
+          <input
+            type="date"
+            value={payoutForm.paid_on}
+            onChange={e => setPayoutForm(f => ({ ...f, paid_on: e.target.value }))}
+            style={{ background: "rgba(10,20,45,0.9)", color: "#a0c8e8", border: "1px solid rgba(100,160,220,0.25)", borderRadius: 8, padding: "5px 7px", fontSize: 13, outline: "none", cursor: "pointer" }}
+          />
+          <input
+            placeholder="Note (optional)"
+            value={payoutForm.note}
+            onChange={e => setPayoutForm(f => ({ ...f, note: e.target.value }))}
+            style={{ background: "rgba(10,20,45,0.9)", color: "#a0c8e8", border: "1px solid rgba(100,160,220,0.25)", borderRadius: 8, padding: "5px 10px", fontSize: 13, outline: "none", width: 180 }}
+          />
+          <button
+            onClick={recordPayout}
+            style={{ background: "#1a4080", color: "#a0c8e8", border: "1px solid rgba(100,160,220,0.4)", borderRadius: 8, padding: "5px 16px", fontSize: 13, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}
+          >
+            Record payout
+          </button>
+        </div>
+
+        {/* Payouts table */}
+        {payouts.length === 0 ? (
+          <p style={{ fontSize: 15, color: "#5a7a90", textAlign: "center", padding: "16px 0" }}>No payouts recorded yet.</p>
+        ) : (
+          <div style={{ overflowX: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+              <thead>
+                <tr style={{ borderBottom: "1px solid rgba(100,160,220,0.35)" }}>
+                  {["Beneficiary", "Amount", "Paid on", "Note"].map(h => (
+                    <th key={h} style={{ padding: "8px 14px", textAlign: "left", fontSize: 11, color: "#a0c8e8", fontWeight: 700, letterSpacing: "0.08em", whiteSpace: "nowrap" }}>
+                      {h.toUpperCase()}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {payouts.map((p, i) => (
+                  <tr key={p.id}
+                    style={{ borderBottom: i < payouts.length - 1 ? "1px solid rgba(100,160,220,0.14)" : "none" }}
+                    onMouseEnter={e => e.currentTarget.style.background = "rgba(100,160,220,0.04)"}
+                    onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+                  >
+                    <td style={{ padding: "10px 14px", fontSize: 14, fontWeight: 600, color: "#ffffff" }}>{p.beneficiary}</td>
+                    <td style={{ padding: "10px 14px", fontSize: 14, color: "#a0c8e8", whiteSpace: "nowrap" }}>{p.currency} {Number(p.amount).toLocaleString()}</td>
+                    <td style={{ padding: "10px 14px", fontSize: 13, color: "#7ab0cc", whiteSpace: "nowrap" }}>{fmtDate(p.paid_on)}</td>
+                    <td style={{ padding: "10px 14px", fontSize: 13, color: "#7ab0cc" }}>{p.note || "—"}</td>
                   </tr>
                 ))}
               </tbody>

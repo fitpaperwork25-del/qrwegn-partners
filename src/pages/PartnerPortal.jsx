@@ -103,12 +103,26 @@ export default function PartnerPortal({ profile, onLogout }) {
   const [recruitSuccess, setRecruitSuccess] = useState(false);
   const [recruitError,   setRecruitError]   = useState("");
   const [showRecruitForm, setShowRecruitForm] = useState(false);
+  const [myLeads,         setMyLeads]         = useState([]);
+  const [myPayouts,       setMyPayouts]       = useState([]);
 
-  useEffect(() => { init(); loadPromotors(); }, []);
+  useEffect(() => { init(); loadPromotors(); loadMyLeads(); loadMyPayouts(); }, []);
 
   const init = () => {
     setChecklist(DEFAULT_CHECKLIST.map(item => ({ ...item, done: false })));
     setLoading(false);
+  };
+
+  const loadMyLeads = () => {
+    supabase.from("leads").select("*").order("created_at", { ascending: false }).then(({ data, error }) => {
+      if (!error) setMyLeads(data || []);
+    });
+  };
+
+  const loadMyPayouts = () => {
+    supabase.from("payouts").select("*").order("paid_on", { ascending: false }).then(({ data, error }) => {
+      if (!error) setMyPayouts(data || []);
+    });
   };
 
   const loadPromotors = async () => {
@@ -282,6 +296,62 @@ export default function PartnerPortal({ profile, onLogout }) {
 
         {/* HOME */}
         {tab === "home" && (
+          <div>
+          {(() => {
+            const EARNING_STATUSES = ["signed", "active"];
+            const owedByCurrency = {};
+            myLeads.forEach(l => {
+              if (!EARNING_STATUSES.includes(l.status)) return;
+              if (l.monthly_value == null || l.partner_pct == null) return;
+              const cur = l.currency || "USD";
+              owedByCurrency[cur] = (owedByCurrency[cur] || 0) + l.monthly_value * l.partner_pct / 100;
+            });
+            const paidByCurrency = {};
+            myPayouts.forEach(p => {
+              const cur = p.currency || "USD";
+              paidByCurrency[cur] = (paidByCurrency[cur] || 0) + Number(p.amount);
+            });
+            const allCurrencies = [...new Set([...Object.keys(owedByCurrency), ...Object.keys(paidByCurrency)])];
+            const earningRows = allCurrencies.map(cur => ({
+              currency: cur,
+              owed: owedByCurrency[cur] || 0,
+              paid: paidByCurrency[cur] || 0,
+              balance: (owedByCurrency[cur] || 0) - (paidByCurrency[cur] || 0),
+            }));
+            return (
+              <Card style={{ marginBottom: 16 }}>
+                <SectionLabel>MY EARNINGS</SectionLabel>
+                {earningRows.length === 0 ? (
+                  <p style={{ fontSize: 14, color: "#3a5a70", margin: 0 }}>No earnings yet.</p>
+                ) : (
+                  <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                    <thead>
+                      <tr style={{ borderBottom: "1px solid rgba(50,80,140,0.35)" }}>
+                        {["Currency", "Owed", "Paid", "Balance"].map(h => (
+                          <th key={h} style={{ padding: "7px 12px", textAlign: "left", fontSize: 11, color: "#4a7090", fontWeight: 700, letterSpacing: "0.08em" }}>
+                            {h.toUpperCase()}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {earningRows.map(r => {
+                        const balanceColor = r.balance > 0 ? "#e8c547" : "#7ac77a";
+                        return (
+                          <tr key={r.currency} style={{ borderBottom: "1px solid rgba(50,80,140,0.14)" }}>
+                            <td style={{ padding: "10px 12px", fontSize: 13, color: "#7ab0cc" }}>{r.currency}</td>
+                            <td style={{ padding: "10px 12px", fontSize: 13, color: "#a0c8e8", whiteSpace: "nowrap" }}>{r.currency} {r.owed.toFixed(2)}</td>
+                            <td style={{ padding: "10px 12px", fontSize: 13, color: "#a0c8e8", whiteSpace: "nowrap" }}>{r.currency} {r.paid.toFixed(2)}</td>
+                            <td style={{ padding: "10px 12px", fontSize: 14, fontWeight: 700, color: balanceColor, whiteSpace: "nowrap" }}>{r.currency} {r.balance.toFixed(2)}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                )}
+              </Card>
+            );
+          })()}
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 16 }}>
             <Card>
               <SectionLabel>ONBOARDING CHECKLIST</SectionLabel>
@@ -320,6 +390,7 @@ export default function PartnerPortal({ profile, onLogout }) {
                 Complete onboarding to start bringing businesses onto the QR-Wegn platform and earning commissions.
               </div>
             </Card>
+          </div>
           </div>
         )}
 

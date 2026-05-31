@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { supabase } from "../lib/supabase";
 
 const TABS = [
@@ -53,11 +53,21 @@ export default function PromotorPortal({ profile, onLogout }) {
   const [myLeads,      setMyLeads]     = useState([]);
   const [leadsLoading, setLeadsLoading] = useState(false);
   const [leadsLoaded,  setLeadsLoaded] = useState(false);
+  const [myPayouts,    setMyPayouts]   = useState([]);
 
   const initials  = profile?.full_name
     ? profile.full_name.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase()
     : "P";
   const firstName = profile?.full_name?.split(" ")[0] || "Promotor";
+
+  useEffect(() => {
+    supabase.from("leads").select("*").order("created_at", { ascending: false }).then(({ data, error }) => {
+      if (!error) { setMyLeads(data || []); setLeadsLoaded(true); }
+    });
+    supabase.from("payouts").select("*").order("paid_on", { ascending: false }).then(({ data, error }) => {
+      if (!error) setMyPayouts(data || []);
+    });
+  }, []);
 
   const switchTab = async (id) => {
     setTabState(id);
@@ -153,16 +163,73 @@ export default function PromotorPortal({ profile, onLogout }) {
 
         {/* HOME */}
         {tab === "home" && (
-          <Card style={{ maxWidth: 540 }}>
-            <SectionLabel>WELCOME</SectionLabel>
-            <p style={{ fontSize: 15, color: "#b0cce0", margin: "0 0 10px", lineHeight: 1.6 }}>
-              Hi {firstName}, glad you're here.
-            </p>
-            <p style={{ fontSize: 14, color: "#4a7090", margin: 0, lineHeight: 1.7 }}>
-              Submit restaurants you've signed. You'll see them under{" "}
-              <strong style={{ color: "#5ab0f0" }}>My Leads</strong>.
-            </p>
-          </Card>
+          <div style={{ display: "flex", flexDirection: "column", gap: 16, maxWidth: 540 }}>
+            {(() => {
+              const EARNING_STATUSES = ["signed", "active"];
+              const owedByCurrency = {};
+              myLeads.forEach(l => {
+                if (!EARNING_STATUSES.includes(l.status)) return;
+                if (l.monthly_value == null || l.promotor_pct == null) return;
+                const cur = l.currency || "USD";
+                owedByCurrency[cur] = (owedByCurrency[cur] || 0) + l.monthly_value * l.promotor_pct / 100;
+              });
+              const paidByCurrency = {};
+              myPayouts.forEach(p => {
+                const cur = p.currency || "USD";
+                paidByCurrency[cur] = (paidByCurrency[cur] || 0) + Number(p.amount);
+              });
+              const allCurrencies = [...new Set([...Object.keys(owedByCurrency), ...Object.keys(paidByCurrency)])];
+              const earningRows = allCurrencies.map(cur => ({
+                currency: cur,
+                owed: owedByCurrency[cur] || 0,
+                paid: paidByCurrency[cur] || 0,
+                balance: (owedByCurrency[cur] || 0) - (paidByCurrency[cur] || 0),
+              }));
+              return (
+                <Card>
+                  <SectionLabel>MY EARNINGS</SectionLabel>
+                  {earningRows.length === 0 ? (
+                    <p style={{ fontSize: 14, color: "#3a5a70", margin: 0 }}>No earnings yet.</p>
+                  ) : (
+                    <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                      <thead>
+                        <tr style={{ borderBottom: "1px solid rgba(50,80,140,0.35)" }}>
+                          {["Currency", "Owed", "Paid", "Balance"].map(h => (
+                            <th key={h} style={{ padding: "7px 12px", textAlign: "left", fontSize: 11, color: "#4a7090", fontWeight: 700, letterSpacing: "0.08em" }}>
+                              {h.toUpperCase()}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {earningRows.map(r => {
+                          const balanceColor = r.balance > 0 ? "#e8c547" : "#7ac77a";
+                          return (
+                            <tr key={r.currency} style={{ borderBottom: "1px solid rgba(50,80,140,0.14)" }}>
+                              <td style={{ padding: "10px 12px", fontSize: 13, color: "#7ab0cc" }}>{r.currency}</td>
+                              <td style={{ padding: "10px 12px", fontSize: 13, color: "#a0c8e8", whiteSpace: "nowrap" }}>{r.currency} {r.owed.toFixed(2)}</td>
+                              <td style={{ padding: "10px 12px", fontSize: 13, color: "#a0c8e8", whiteSpace: "nowrap" }}>{r.currency} {r.paid.toFixed(2)}</td>
+                              <td style={{ padding: "10px 12px", fontSize: 14, fontWeight: 700, color: balanceColor, whiteSpace: "nowrap" }}>{r.currency} {r.balance.toFixed(2)}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  )}
+                </Card>
+              );
+            })()}
+            <Card>
+              <SectionLabel>WELCOME</SectionLabel>
+              <p style={{ fontSize: 15, color: "#b0cce0", margin: "0 0 10px", lineHeight: 1.6 }}>
+                Hi {firstName}, glad you're here.
+              </p>
+              <p style={{ fontSize: 14, color: "#4a7090", margin: 0, lineHeight: 1.7 }}>
+                Submit restaurants you've signed. You'll see them under{" "}
+                <strong style={{ color: "#5ab0f0" }}>My Leads</strong>.
+              </p>
+            </Card>
+          </div>
         )}
 
         {/* SUBMIT LEAD */}

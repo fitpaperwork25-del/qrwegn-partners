@@ -200,7 +200,7 @@ export default function AdminDashboard({ navigate }) {
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
               <thead>
                 <tr style={{ borderBottom: "1px solid rgba(100,160,220,0.35)" }}>
-                  {["Business", "Owner", "Phone", "Country", "Notes", "Status", "Follow-up", "Plan", "Price", "Submitted by", "Date"].map(h => (
+                  {["Business", "Owner", "Phone", "Country", "Notes", "Status", "Follow-up", "Plan", "Price", "Promotor %", "Partner %", "Submitted by", "Date"].map(h => (
                     <th key={h} style={{ padding: "10px 14px", textAlign: "left", fontSize: 11, color: "#a0c8e8", fontWeight: 700, letterSpacing: "0.08em", whiteSpace: "nowrap" }}>
                       {h.toUpperCase()}
                     </th>
@@ -321,6 +321,54 @@ export default function AdminDashboard({ navigate }) {
                             width: 70,
                           }}
                         />
+                      </div>
+                    </td>
+                    <td style={{ padding: "12px 14px" }}>
+                      <input
+                        type="number"
+                        placeholder="0"
+                        value={l.promotor_pct ?? ""}
+                        onChange={e => updateLead(l.id, { promotor_pct: e.target.value === "" ? null : Number(e.target.value) })}
+                        style={{
+                          background: "rgba(10,20,45,0.9)",
+                          color: "#a0c8e8",
+                          border: "1px solid rgba(100,160,220,0.25)",
+                          borderRadius: 8,
+                          padding: "3px 7px",
+                          fontSize: 12,
+                          outline: "none",
+                          width: 55,
+                          display: "block",
+                        }}
+                      />
+                      <div style={{ fontSize: 11, color: "#5a7a90", marginTop: 3 }}>
+                        {l.monthly_value != null && l.promotor_pct != null
+                          ? `${l.currency || "USD"} ${(l.monthly_value * l.promotor_pct / 100).toFixed(2)}`
+                          : "—"}
+                      </div>
+                    </td>
+                    <td style={{ padding: "12px 14px" }}>
+                      <input
+                        type="number"
+                        placeholder="0"
+                        value={l.partner_pct ?? ""}
+                        onChange={e => updateLead(l.id, { partner_pct: e.target.value === "" ? null : Number(e.target.value) })}
+                        style={{
+                          background: "rgba(10,20,45,0.9)",
+                          color: "#a0c8e8",
+                          border: "1px solid rgba(100,160,220,0.25)",
+                          borderRadius: 8,
+                          padding: "3px 7px",
+                          fontSize: 12,
+                          outline: "none",
+                          width: 55,
+                          display: "block",
+                        }}
+                      />
+                      <div style={{ fontSize: 11, color: "#5a7a90", marginTop: 3 }}>
+                        {l.monthly_value != null && l.partner_pct != null
+                          ? `${l.currency || "USD"} ${(l.monthly_value * l.partner_pct / 100).toFixed(2)}`
+                          : "—"}
                       </div>
                     </td>
                     <td style={{ padding: "12px 14px", fontSize: 13, color: "#5ab0f0", whiteSpace: "nowrap" }}>{l.submitted_by_partner?.full_name || "—"}</td>

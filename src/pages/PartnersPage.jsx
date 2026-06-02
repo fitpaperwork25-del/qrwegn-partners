@@ -161,7 +161,11 @@ export default function PartnersPage({ navigate }) {
                         display: "flex", alignItems: "center", justifyContent: "center",
                         fontSize: 19, fontWeight: 700, color: "#5ab0f0", flexShrink: 0
                       }}>{(p.full_name || "?").split(" ").map(n => n[0]).join("").slice(0, 2)}</div>
-                      <span style={{ fontSize: 20, fontWeight: 600, color: "#ffffff" }}>{p.full_name}</span>
+                      <span
+                        onClick={() => navigate("partner-profile", { partnerId: p.id })}
+                        style={{ fontSize: 20, fontWeight: 600, color: "#7dc4ff", cursor: "pointer" }}>
+                        {p.full_name}
+                      </span>
                     </div>
                   </td>
                   <td style={{ padding: "14px 18px", fontSize: 19, color: "#b0cce0" }}>{p.territory || "—"}</td>
@@ -247,7 +251,11 @@ export default function PartnersPage({ navigate }) {
                   }}>
                     {(parent.full_name || "?").split(" ").map(n => n[0]).join("").slice(0, 2)}
                   </div>
-                  <span style={{ fontSize: 14, fontWeight: 700, color: "#c0d8e8" }}>{parent.full_name}</span>
+                  <span
+                    onClick={() => navigate("partner-profile", { partnerId: parent.id })}
+                    style={{ fontSize: 14, fontWeight: 700, color: "#7dc4ff", cursor: "pointer" }}>
+                    {parent.full_name}
+                  </span>
                   <span style={{ fontSize: 12, color: "#5ab0f0", background: "rgba(80,160,230,0.12)", border: "1px solid rgba(80,160,230,0.22)", padding: "2px 9px", borderRadius: 20, fontWeight: 600 }}>
                     {team.length} promotor{team.length !== 1 ? "s" : ""}
                   </span>

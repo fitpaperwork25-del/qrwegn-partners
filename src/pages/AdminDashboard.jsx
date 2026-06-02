@@ -617,7 +617,7 @@ export default function AdminDashboard({ navigate }) {
                 <table style={{ width: "100%", borderCollapse: "collapse" }}>
                   <thead>
                     <tr style={{ borderBottom: "1px solid rgba(100,160,220,0.35)" }}>
-                      {["Person", "Role", "Currency", "Owed", "Paid", "Balance"].map(h => (
+                      {["Person", "Role", "Currency", "Owed", "Paid", "Balance", "Overpaid"].map(h => (
                         <th key={h} style={{ padding: "8px 14px", textAlign: "left", fontSize: 11, color: "#a0c8e8", fontWeight: 700, letterSpacing: "0.08em", whiteSpace: "nowrap" }}>
                           {h.toUpperCase()}
                         </th>
@@ -626,7 +626,8 @@ export default function AdminDashboard({ navigate }) {
                   </thead>
                   <tbody>
                     {rows.map((r, i) => {
-                      const balance = r.owed - r.paid;
+                      const balance  = Math.max(0, r.owed - r.paid);
+                      const overpaid = r.paid > r.owed ? r.paid - r.owed : 0;
                       const balanceColor = balance > 0 ? "#e8c547" : "#7ac77a";
                       return (
                         <tr key={`${r.type}:${r.name}:${r.currency}`}
@@ -640,6 +641,7 @@ export default function AdminDashboard({ navigate }) {
                           <td style={{ padding: "10px 14px", fontSize: 13, color: "#a0c8e8", whiteSpace: "nowrap" }}>{r.currency} {r.owed.toFixed(2)}</td>
                           <td style={{ padding: "10px 14px", fontSize: 13, color: "#a0c8e8", whiteSpace: "nowrap" }}>{r.currency} {r.paid.toFixed(2)}</td>
                           <td style={{ padding: "10px 14px", fontSize: 14, fontWeight: 700, color: balanceColor, whiteSpace: "nowrap" }}>{r.currency} {balance.toFixed(2)}</td>
+                          <td style={{ padding: "10px 14px", fontSize: 14, fontWeight: 700, color: overpaid > 0 ? "#f07070" : "#3a5a70", whiteSpace: "nowrap" }}>{r.currency} {overpaid.toFixed(2)}</td>
                         </tr>
                       );
                     })}

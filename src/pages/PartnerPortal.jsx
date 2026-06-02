@@ -107,14 +107,20 @@ const emptyLead = {
 };
 
 const BASE_TABS = [
-  { id: "home", label: "Home" },
-  { id: "profile", label: "My Profile" },
-  { id: "my-promotors", label: "My Promotors" },
-  { id: "commissions", label: "Commissions" },
-  { id: "training", label: "Training" },
-  { id: "materials", label: "Materials" },
-  { id: "leads", label: "Submit Lead" },
+  { id: "home",          label: "Home"          },
+  { id: "profile",       label: "My Profile"    },
+  { id: "my-promotors",  label: "My Promotors"  },
+  { id: "my-leads",      label: "My Leads"      },
+  { id: "commissions",   label: "Commissions"   },
+  { id: "training",      label: "Training"      },
+  { id: "materials",     label: "Materials"     },
+  { id: "leads",         label: "Submit Lead"   },
 ];
+
+function fmtDate(iso) {
+  if (!iso) return "—";
+  return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+}
 
 const inputStyle = {
   width: "100%",
@@ -192,6 +198,7 @@ const FieldRow = ({ label, value }) => (
 
 export default function PartnerPortal({ profile, onLogout }) {
   const [tab, setTab] = useState("home");
+  const [selectedLead, setSelectedLead] = useState(null);
   const [checklist, setChecklist] = useState(
     CHECKLIST_ITEMS.map((item) => ({ ...item, completed: false }))
   );
@@ -1612,6 +1619,119 @@ export default function PartnerPortal({ profile, onLogout }) {
             </div>
           </Card>
         )}
+
+        {/* MY LEADS — list */}
+        {tab === "my-leads" && !selectedLead && (
+          <Card>
+            <SectionLabel>MY LEADS</SectionLabel>
+            {myLeads.length === 0 ? (
+              <div style={{ textAlign: "center", padding: "32px 0" }}>
+                <div style={{ fontSize: 15, color: "#3a5a70" }}>No leads yet.</div>
+                <div style={{ fontSize: 13, color: "#2a4050", marginTop: 6 }}>Submit your first lead from the Submit Lead tab.</div>
+              </div>
+            ) : (
+              <div style={{ overflowX: "auto" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                  <thead>
+                    <tr style={{ borderBottom: "1px solid rgba(50,80,140,0.35)" }}>
+                      {["Business", "Contact", "Promotor", "Status", "Date"].map((h) => (
+                        <th key={h} style={{ padding: "10px 14px", textAlign: "left", fontSize: 11, color: "#4a7090", fontWeight: 700, letterSpacing: "0.08em" }}>
+                          {h.toUpperCase()}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {myLeads.map((l, i) => (
+                      <tr key={l.id}
+                        onClick={() => setSelectedLead(l)}
+                        style={{ borderBottom: i < myLeads.length - 1 ? "1px solid rgba(50,80,140,0.14)" : "none", cursor: "pointer" }}
+                        onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(80,140,210,0.07)")}
+                        onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+                      >
+                        <td style={{ padding: "12px 14px", fontSize: 14, fontWeight: 600, color: "#ffffff" }}>{l.business_name}</td>
+                        <td style={{ padding: "12px 14px", fontSize: 14, color: "#b0cce0" }}>{l.contact_name || "—"}</td>
+                        <td style={{ padding: "12px 14px", fontSize: 13, color: "#7ab0cc" }}>
+                          {promotors.find((p) => p.id === l.submitted_by_promotor_id)?.full_name || "—"}
+                        </td>
+                        <td style={{ padding: "12px 14px" }}>
+                          <span style={{ fontSize: 11, fontWeight: 700, padding: "3px 10px", borderRadius: 20, background: "rgba(100,160,220,0.18)", color: "#5ab0f0", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                            {l.status || "new"}
+                          </span>
+                        </td>
+                        <td style={{ padding: "12px 14px", fontSize: 13, color: "#4a7090", whiteSpace: "nowrap" }}>{fmtDate(l.created_at)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </Card>
+        )}
+
+        {/* MY LEADS — detail */}
+        {tab === "my-leads" && selectedLead && (() => {
+          const promotorName    = promotors.find((p) => p.id === selectedLead.submitted_by_promotor_id)?.full_name || null;
+          const partnerComm     = selectedLead.monthly_value != null && selectedLead.partner_pct != null
+            ? `${selectedLead.currency || "USD"} ${(Number(selectedLead.monthly_value) * Number(selectedLead.partner_pct) / 100).toFixed(2)}`
+            : null;
+          const promotorComm    = selectedLead.monthly_value != null && selectedLead.promotor_pct != null
+            ? `${selectedLead.currency || "USD"} ${(Number(selectedLead.monthly_value) * Number(selectedLead.promotor_pct) / 100).toFixed(2)}`
+            : null;
+          const monthlyDisplay  = selectedLead.monthly_value != null
+            ? `${selectedLead.currency || "USD"} ${Number(selectedLead.monthly_value).toFixed(2)}`
+            : null;
+
+          return (
+            <div style={{ maxWidth: 580 }}>
+              <button
+                onClick={() => setSelectedLead(null)}
+                style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 18, background: "none", border: "none", cursor: "pointer", color: "#5ab0f0", fontSize: 13, fontWeight: 700, padding: 0 }}
+              >
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                  <path d="M10 3L5 8L10 13" stroke="#5ab0f0" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+                Back to My Leads
+              </button>
+
+              <Card>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, marginBottom: 20 }}>
+                  <div>
+                    <div style={{ fontSize: 20, fontWeight: 800, color: "#ffffff", marginBottom: 4 }}>{selectedLead.business_name}</div>
+                    <div style={{ fontSize: 13, color: "#4a7090" }}>Submitted {fmtDate(selectedLead.created_at)}</div>
+                  </div>
+                  <span style={{ fontSize: 11, fontWeight: 700, padding: "4px 12px", borderRadius: 20, background: "rgba(100,160,220,0.18)", color: "#5ab0f0", textTransform: "uppercase", letterSpacing: "0.06em", flexShrink: 0 }}>
+                    {selectedLead.status || "new"}
+                  </span>
+                </div>
+
+                <div style={{ display: "flex", flexDirection: "column" }}>
+                  {[
+                    { label: "Contact Name",         value: selectedLead.contact_name },
+                    { label: "Phone",                value: selectedLead.phone },
+                    { label: "Country",              value: selectedLead.country },
+                    { label: "Plan",                 value: selectedLead.plan },
+                    { label: "Monthly Value",        value: monthlyDisplay },
+                    { label: "Promotor",             value: promotorName },
+                    { label: "Partner Commission",   value: partnerComm },
+                    { label: "Promotor Commission",  value: promotorComm },
+                    { label: "Follow-up Date",       value: fmtDate(selectedLead.follow_up_date) === "—" ? null : fmtDate(selectedLead.follow_up_date) },
+                    { label: "Submitted",            value: fmtDate(selectedLead.created_at) },
+                  ].map(({ label, value }) => (
+                    <FieldRow key={label} label={label} value={value} />
+                  ))}
+
+                  <div style={{ padding: "14px 0" }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: "#4a7090", letterSpacing: "0.07em", marginBottom: 8 }}>NOTES</div>
+                    <div style={{ fontSize: 14, color: selectedLead.notes ? "#c0d8e8" : "#3a5a6a", fontStyle: selectedLead.notes ? "normal" : "italic", lineHeight: 1.7, whiteSpace: "pre-wrap" }}>
+                      {selectedLead.notes || "No notes"}
+                    </div>
+                  </div>
+                </div>
+              </Card>
+            </div>
+          );
+        })()}
 
         {tab === "leads" && (
           <Card style={{ maxWidth: 540 }}>

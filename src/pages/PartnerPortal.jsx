@@ -487,6 +487,55 @@ export default function PartnerPortal({ profile, onLogout }) {
     }));
   }, [myLeads, myPayouts]);
 
+  const reportData = useMemo(() => {
+    const EARNING_STATUSES = ["signed", "active"];
+
+    // Leads by status
+    const byStatus = {};
+    myLeads.forEach((l) => {
+      const s = l.status || "new";
+      byStatus[s] = (byStatus[s] || 0) + 1;
+    });
+
+    // Partner commission per currency
+    const owedMap = {};
+    myLeads.forEach((l) => {
+      if (!EARNING_STATUSES.includes(l.status)) return;
+      if (l.monthly_value == null || l.partner_pct == null) return;
+      const cur = l.currency || "USD";
+      owedMap[cur] = (owedMap[cur] || 0) + (Number(l.monthly_value) * Number(l.partner_pct)) / 100;
+    });
+    const paidMap = {};
+    myPayouts.forEach((p) => {
+      const cur = p.currency || "USD";
+      paidMap[cur] = (paidMap[cur] || 0) + Number(p.amount || 0);
+    });
+    const commCurrencies = [...new Set([...Object.keys(owedMap), ...Object.keys(paidMap)])];
+    const commissionRows = commCurrencies.map((cur) => {
+      const owed = owedMap[cur] || 0;
+      const paid = paidMap[cur] || 0;
+      return { currency: cur, owed, paid, balance: Math.max(0, owed - paid), overpaid: paid > owed ? paid - owed : 0 };
+    });
+
+    // Promotor performance
+    const promotorRows = promotors.map((pr) => {
+      const prLeads = myLeads.filter((l) => l.submitted_by_promotor_id === pr.id);
+      const earnLeads = prLeads.filter((l) => EARNING_STATUSES.includes(l.status));
+      const commByCur = {};
+      earnLeads.forEach((l) => {
+        if (l.monthly_value == null || l.promotor_pct == null) return;
+        const cur = l.currency || "USD";
+        commByCur[cur] = (commByCur[cur] || 0) + (Number(l.monthly_value) * Number(l.promotor_pct)) / 100;
+      });
+      const commSummary = Object.entries(commByCur)
+        .map(([cur, amt]) => `${cur} ${amt.toFixed(2)}`)
+        .join(", ") || "—";
+      return { id: pr.id, name: pr.full_name, leadCount: prLeads.length, signedActiveCount: earnLeads.length, commSummary };
+    });
+
+    return { byStatus, commissionRows, promotorRows };
+  }, [myLeads, myPayouts, promotors]);
+
   const initials = profile?.full_name
     ? profile.full_name
         .split(" ")
@@ -736,6 +785,104 @@ export default function PartnerPortal({ profile, onLogout }) {
 
         {tab === "home" && (
           <div>
+
+            {/* Stats row */}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 12, marginBottom: 16 }}>
+              {[
+                { label: "Promotors",   value: promotors.length },
+                { label: "Total Leads", value: myLeads.length },
+                { label: "Signed",      value: reportData.byStatus["signed"]  || 0 },
+                { label: "Active",      value: reportData.byStatus["active"]  || 0 },
+              ].map((s) => (
+                <Card key={s.label} style={{ padding: "14px 18px" }}>
+                  <div style={{ fontSize: 11, color: "#4a7090", letterSpacing: "0.1em", marginBottom: 6, fontWeight: 700 }}>{s.label.toUpperCase()}</div>
+                  <div style={{ fontSize: 28, fontWeight: 800, color: "#c0d8e8" }}>{s.value}</div>
+                </Card>
+              ))}
+            </div>
+
+            {/* Leads by status */}
+            <Card style={{ marginBottom: 16 }}>
+              <SectionLabel>LEADS BY STATUS</SectionLabel>
+              {myLeads.length === 0 ? (
+                <p style={{ fontSize: 13, color: "#3a5a70", margin: 0 }}>No leads yet.</p>
+              ) : (
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  {Object.entries(reportData.byStatus).map(([status, count]) => (
+                    <div key={status} style={{ background: "rgba(80,140,210,0.12)", border: "1px solid rgba(80,140,210,0.2)", borderRadius: 10, padding: "10px 16px", textAlign: "center", minWidth: 76 }}>
+                      <div style={{ fontSize: 22, fontWeight: 800, color: "#5ab0f0" }}>{count}</div>
+                      <div style={{ fontSize: 11, color: "#4a7090", marginTop: 4, textTransform: "capitalize" }}>{status}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </Card>
+
+            {/* Partner commission */}
+            <Card style={{ marginBottom: 16 }}>
+              <SectionLabel>PARTNER COMMISSION</SectionLabel>
+              {reportData.commissionRows.length === 0 ? (
+                <p style={{ fontSize: 13, color: "#3a5a70", margin: 0 }}>No commission data yet.</p>
+              ) : (
+                <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                  <thead>
+                    <tr style={{ borderBottom: "1px solid rgba(50,80,140,0.35)" }}>
+                      {["Currency", "Owed", "Paid", "Balance", "Overpaid"].map((h) => (
+                        <th key={h} style={{ padding: "7px 12px", textAlign: "left", fontSize: 11, color: "#4a7090", fontWeight: 700, letterSpacing: "0.08em" }}>
+                          {h.toUpperCase()}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {reportData.commissionRows.map((r) => (
+                      <tr key={r.currency} style={{ borderBottom: "1px solid rgba(50,80,140,0.14)" }}>
+                        <td style={{ padding: "10px 12px", fontSize: 13, color: "#7ab0cc" }}>{r.currency}</td>
+                        <td style={{ padding: "10px 12px", fontSize: 13, color: "#a0c8e8", whiteSpace: "nowrap" }}>{r.currency} {r.owed.toFixed(2)}</td>
+                        <td style={{ padding: "10px 12px", fontSize: 13, color: "#a0c8e8", whiteSpace: "nowrap" }}>{r.currency} {r.paid.toFixed(2)}</td>
+                        <td style={{ padding: "10px 12px", fontSize: 14, fontWeight: 700, color: r.balance > 0 ? "#e8c547" : "#7ac77a", whiteSpace: "nowrap" }}>{r.currency} {r.balance.toFixed(2)}</td>
+                        <td style={{ padding: "10px 12px", fontSize: 14, fontWeight: 700, color: r.overpaid > 0 ? "#f07070" : "#3a5a70", whiteSpace: "nowrap" }}>{r.currency} {r.overpaid.toFixed(2)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </Card>
+
+            {/* Promotor performance */}
+            {promotors.length > 0 && (
+              <Card style={{ marginBottom: 16 }}>
+                <SectionLabel>PROMOTOR PERFORMANCE</SectionLabel>
+                <div style={{ overflowX: "auto" }}>
+                  <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                    <thead>
+                      <tr style={{ borderBottom: "1px solid rgba(50,80,140,0.35)" }}>
+                        {["Promotor", "Leads", "Signed / Active", "Commission Owed"].map((h) => (
+                          <th key={h} style={{ padding: "7px 12px", textAlign: "left", fontSize: 11, color: "#4a7090", fontWeight: 700, letterSpacing: "0.08em", whiteSpace: "nowrap" }}>
+                            {h.toUpperCase()}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {reportData.promotorRows.map((pr, i) => (
+                        <tr key={pr.id}
+                          style={{ borderBottom: i < reportData.promotorRows.length - 1 ? "1px solid rgba(50,80,140,0.14)" : "none" }}
+                          onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(80,140,210,0.05)")}
+                          onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+                        >
+                          <td style={{ padding: "11px 12px", fontSize: 14, fontWeight: 600, color: "#c0d8e8" }}>{pr.name}</td>
+                          <td style={{ padding: "11px 12px", fontSize: 14, color: "#a0c8e8" }}>{pr.leadCount}</td>
+                          <td style={{ padding: "11px 12px", fontSize: 14, fontWeight: 700, color: "#5ab0f0" }}>{pr.signedActiveCount}</td>
+                          <td style={{ padding: "11px 12px", fontSize: 14, fontWeight: 700, color: "#e8c547" }}>{pr.commSummary}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </Card>
+            )}
+
             <Card style={{ marginBottom: 16 }}>
               <SectionLabel>MY EARNINGS</SectionLabel>
 

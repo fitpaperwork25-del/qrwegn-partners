@@ -126,8 +126,9 @@ export default function PromotorPortal({ profile, onLogout }) {
   const [leadsLoaded,  setLeadsLoaded] = useState(false);
   const [myPayouts,    setMyPayouts]   = useState([]);
   const [demoLinks,    setDemoLinks]   = useState([]);
-  const [training,     setTraining]    = useState(DEFAULT_TRAINING);
-  const [materials,    setMaterials]   = useState(DEFAULT_MATERIALS);
+  const [training,      setTraining]     = useState(DEFAULT_TRAINING);
+  const [materials,     setMaterials]    = useState(DEFAULT_MATERIALS);
+  const [selectedLead,  setSelectedLead] = useState(null);
 
   const initials  = profile?.full_name
     ? profile.full_name.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase()
@@ -406,7 +407,7 @@ export default function PromotorPortal({ profile, onLogout }) {
         )}
 
         {/* MY LEADS */}
-        {tab === "my-leads" && (
+        {tab === "my-leads" && !selectedLead && (
           <Card>
             <SectionLabel>MY LEADS</SectionLabel>
             {leadsLoading ? (
@@ -431,8 +432,9 @@ export default function PromotorPortal({ profile, onLogout }) {
                   <tbody>
                     {myLeads.map((l, i) => (
                       <tr key={l.id}
-                        style={{ borderBottom: i < myLeads.length - 1 ? "1px solid rgba(50,80,140,0.14)" : "none" }}
-                        onMouseEnter={e => e.currentTarget.style.background = "rgba(80,140,210,0.04)"}
+                        onClick={() => setSelectedLead(l)}
+                        style={{ borderBottom: i < myLeads.length - 1 ? "1px solid rgba(50,80,140,0.14)" : "none", cursor: "pointer" }}
+                        onMouseEnter={e => e.currentTarget.style.background = "rgba(80,140,210,0.07)"}
                         onMouseLeave={e => e.currentTarget.style.background = "transparent"}
                       >
                         <td style={{ padding: "12px 14px", fontSize: 14, fontWeight: 600, color: "#ffffff" }}>{l.business_name}</td>
@@ -450,6 +452,83 @@ export default function PromotorPortal({ profile, onLogout }) {
               </div>
             )}
           </Card>
+        )}
+
+        {/* LEAD DETAIL */}
+        {tab === "my-leads" && selectedLead && (
+          <div style={{ maxWidth: 580 }}>
+            <button
+              onClick={() => setSelectedLead(null)}
+              style={{
+                display: "flex", alignItems: "center", gap: 6, marginBottom: 18,
+                background: "none", border: "none", cursor: "pointer",
+                color: "#5ab0f0", fontSize: 13, fontWeight: 700, padding: 0,
+              }}
+            >
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                <path d="M10 3L5 8L10 13" stroke="#5ab0f0" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              Back to My Leads
+            </button>
+
+            <Card>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, marginBottom: 20 }}>
+                <div>
+                  <div style={{ fontSize: 20, fontWeight: 800, color: "#ffffff", marginBottom: 4 }}>
+                    {selectedLead.business_name}
+                  </div>
+                  <div style={{ fontSize: 13, color: "#4a7090" }}>
+                    Submitted {fmtDate(selectedLead.created_at)}
+                  </div>
+                </div>
+                <span style={{
+                  fontSize: 11, fontWeight: 700, padding: "4px 12px", borderRadius: 20,
+                  background: "rgba(100,160,220,0.18)", color: "#5ab0f0",
+                  textTransform: "uppercase", letterSpacing: "0.06em", flexShrink: 0,
+                }}>
+                  {selectedLead.status || "new"}
+                </span>
+              </div>
+
+              <div style={{ display: "flex", flexDirection: "column" }}>
+                {[
+                  { label: "Contact Name",    value: selectedLead.contact_name },
+                  { label: "Phone",           value: selectedLead.phone },
+                  { label: "Country",         value: selectedLead.country },
+                  { label: "Plan",            value: selectedLead.plan },
+                  { label: "Monthly Value",   value: selectedLead.monthly_value != null ? `${selectedLead.currency || "USD"} ${Number(selectedLead.monthly_value).toFixed(2)}` : null },
+                  { label: "Follow-up Date",  value: fmtDate(selectedLead.follow_up_date) === "—" ? null : fmtDate(selectedLead.follow_up_date) },
+                  { label: "Submitted",       value: fmtDate(selectedLead.created_at) },
+                ].map(({ label, value }) => (
+                  <div key={label} style={{
+                    display: "flex", padding: "13px 0",
+                    borderBottom: "1px solid rgba(50,80,140,0.18)",
+                  }}>
+                    <div style={{ width: 140, fontSize: 11, fontWeight: 700, color: "#4a7090", letterSpacing: "0.07em", flexShrink: 0, paddingTop: 1 }}>
+                      {label.toUpperCase()}
+                    </div>
+                    <div style={{ fontSize: 14, color: value ? "#c0d8e8" : "#3a5060", fontStyle: value ? "normal" : "italic" }}>
+                      {value || "Not set"}
+                    </div>
+                  </div>
+                ))}
+
+                {/* Notes — full width block */}
+                <div style={{ padding: "13px 0" }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: "#4a7090", letterSpacing: "0.07em", marginBottom: 8 }}>
+                    NOTES
+                  </div>
+                  <div style={{
+                    fontSize: 14, color: selectedLead.notes ? "#c0d8e8" : "#3a5060",
+                    fontStyle: selectedLead.notes ? "normal" : "italic",
+                    lineHeight: 1.7, whiteSpace: "pre-wrap",
+                  }}>
+                    {selectedLead.notes || "No notes"}
+                  </div>
+                </div>
+              </div>
+            </Card>
+          </div>
         )}
 
         {/* TRAINING */}

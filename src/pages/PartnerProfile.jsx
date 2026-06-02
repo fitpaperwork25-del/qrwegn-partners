@@ -70,6 +70,7 @@ export default function PartnerProfile({ partnerId, navigate }) {
   const [leads,            setLeads]            = useState([]);
   const [partnerPayouts,   setPartnerPayouts]   = useState([]);
   const [dataLoading,      setDataLoading]      = useState(false);
+  const [linkCopied,       setLinkCopied]       = useState(false);
 
   // ── Loaders ──────────────────────────────────────────────────────
 
@@ -263,6 +264,24 @@ export default function PartnerProfile({ partnerId, navigate }) {
           </div>
           <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 10 }}>
             <StageBadge stage={partner.stage || "Identified"} />
+            <button
+              onClick={() => {
+                const link = `https://qrwegn-partners.vercel.app/join/${partnerId}`;
+                navigator.clipboard.writeText(link).then(() => {
+                  setLinkCopied(true);
+                  setTimeout(() => setLinkCopied(false), 2000);
+                });
+              }}
+              style={{
+                padding: "7px 14px", borderRadius: 8, fontSize: 13, fontWeight: 600,
+                border: `1.5px solid ${linkCopied ? "rgba(40,180,80,0.5)" : "rgba(100,160,220,0.35)"}`,
+                background: linkCopied ? "rgba(40,180,80,0.12)" : "rgba(8,16,36,0.8)",
+                color: linkCopied ? "#35c060" : "#a0c8e8",
+                cursor: "pointer", transition: "all 0.15s", whiteSpace: "nowrap",
+              }}
+            >
+              {linkCopied ? "✓ Copied!" : "Copy Referral Link"}
+            </button>
             <select
               value={partner.stage || "Identified"}
               onChange={async (e) => {

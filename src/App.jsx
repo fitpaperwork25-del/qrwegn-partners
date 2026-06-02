@@ -8,8 +8,16 @@ import TrainingPage from "./pages/TrainingPage";
 import MaterialsPage from "./pages/MaterialsPage";
 import PartnerPortal from "./pages/PartnerPortal";
 import PromotorPortal from "./pages/PromotorPortal";
+import JoinPage from "./pages/JoinPage";
 
+// Top-level router — no hooks here so the /join early-return is rules-of-hooks safe
 export default function App() {
+  const joinMatch = window.location.pathname.match(/^\/join\/([^/]+)/);
+  if (joinMatch) return <JoinPage partnerId={joinMatch[1]} />;
+  return <PortalApp />;
+}
+
+function PortalApp() {
   const [page, setPage] = useState(
     window.location.hash.includes("type=recovery") ? "reset-password" : "login"
   );

@@ -19,6 +19,14 @@ const TRAINING_STATUS_COLORS = {
   assigned:    { bg: "rgba(100,160,220,0.3)", color: "#5ab0f0", label: "Assigned" },
 };
 
+const PROMOTOR_STATUS_STYLE = {
+  Interested: { color: "#5ab0f0", bg: "rgba(100,160,220,0.18)" },
+  active:     { color: "#35c060", bg: "rgba(40,180,80,0.12)"   },
+  rejected:   { color: "#f07070", bg: "rgba(220,80,80,0.12)"   },
+};
+const promotorStatusStyle = (s) =>
+  PROMOTOR_STATUS_STYLE[s] || { color: "#a0c8e8", bg: "rgba(100,160,220,0.1)" };
+
 const TABS = ["overview", "promotors", "leads", "earnings", "communication", "training", "materials"];
 const EARNING_STATUSES = ["signed", "active"];
 
@@ -71,6 +79,7 @@ export default function PartnerProfile({ partnerId, navigate }) {
   const [partnerPayouts,   setPartnerPayouts]   = useState([]);
   const [dataLoading,      setDataLoading]      = useState(false);
   const [linkCopied,       setLinkCopied]       = useState(false);
+  const [approvingId,      setApprovingId]      = useState(null);
 
   // ── Loaders ──────────────────────────────────────────────────────
 
@@ -162,6 +171,18 @@ export default function PartnerProfile({ partnerId, navigate }) {
     });
     setSaving(false);
     if (!error) { setNote(""); loadComms(); }
+  };
+
+  const updatePromotorStatus = async (promotorId, newStatus) => {
+    setApprovingId(promotorId);
+    const { error } = await supabase
+      .from("promotors")
+      .update({ status: newStatus })
+      .eq("id", promotorId);
+    if (!error) {
+      setPromotors(prev => prev.map(p => p.id === promotorId ? { ...p, status: newStatus } : p));
+    }
+    setApprovingId(null);
   };
 
   // ── Computed values ───────────────────────────────────────────────
@@ -399,40 +420,70 @@ export default function PartnerProfile({ partnerId, navigate }) {
                     <TH>Email</TH>
                     <TH>Phone</TH>
                     <TH>Territory</TH>
-                    <TH>Leads Submitted</TH>
-                    <TH>Commission Earned</TH>
+                    <TH>Status</TH>
+                    <TH>Leads</TH>
+                    <TH>Commission</TH>
+                    <TH>Actions</TH>
                   </tr>
                 </thead>
                 <tbody>
-                  {allPromotors.map((pr, i) => (
-                    <tr key={pr.id}
-                      style={{ borderBottom: i < allPromotors.length - 1 ? "1px solid rgba(100,160,220,0.14)" : "none", cursor: pr.isSubPartner ? "pointer" : "default", transition: "background 0.1s" }}
-                      onMouseEnter={e => e.currentTarget.style.background = "rgba(100,160,220,0.05)"}
-                      onMouseLeave={e => e.currentTarget.style.background = "transparent"}
-                      onClick={() => pr.isSubPartner && navigate("partner-profile", { partnerId: pr.id })}
-                    >
-                      <td style={{ padding: "12px 14px" }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                          <div style={{ width: 28, height: 28, borderRadius: "50%", background: "linear-gradient(135deg, #1a3560, #0d2045)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700, color: "#5ab0f0", flexShrink: 0 }}>
-                            {(pr.full_name || "?").split(" ").map(n => n[0]).join("").slice(0, 2)}
+                  {allPromotors.map((pr, i) => {
+                    const sc      = promotorStatusStyle(pr.status);
+                    const isPending = pr.status === "Interested";
+                    const isBusy  = approvingId === pr.id;
+                    return (
+                      <tr key={pr.id}
+                        style={{ borderBottom: i < allPromotors.length - 1 ? "1px solid rgba(100,160,220,0.14)" : "none", cursor: pr.isSubPartner ? "pointer" : "default", transition: "background 0.1s" }}
+                        onMouseEnter={e => e.currentTarget.style.background = "rgba(100,160,220,0.05)"}
+                        onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+                        onClick={() => pr.isSubPartner && navigate("partner-profile", { partnerId: pr.id })}
+                      >
+                        <td style={{ padding: "12px 14px" }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                            <div style={{ width: 28, height: 28, borderRadius: "50%", background: "linear-gradient(135deg, #1a3560, #0d2045)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700, color: "#5ab0f0", flexShrink: 0 }}>
+                              {(pr.full_name || "?").split(" ").map(n => n[0]).join("").slice(0, 2)}
+                            </div>
+                            <span style={{ fontSize: 14, fontWeight: 600, color: pr.isSubPartner ? "#7dc4ff" : "#ffffff" }}>{pr.full_name}</span>
                           </div>
-                          <span style={{ fontSize: 14, fontWeight: 600, color: pr.isSubPartner ? "#7dc4ff" : "#ffffff" }}>{pr.full_name}</span>
-                        </div>
-                      </td>
-                      <td style={{ padding: "12px 14px" }}>
-                        <span style={{ fontSize: 12, fontWeight: 600, background: pr.isSubPartner ? "rgba(100,160,220,0.18)" : "rgba(80,180,140,0.12)", color: pr.isSubPartner ? "#5ab0f0" : "#35c080", padding: "2px 9px", borderRadius: 20 }}>
-                          {pr.isSubPartner ? "sub-partner" : (pr.type || "promotor")}
-                        </span>
-                      </td>
-                      <td style={{ padding: "12px 14px", fontSize: 13, color: "#7ab0cc" }}>{pr.email || "—"}</td>
-                      <td style={{ padding: "12px 14px", fontSize: 13, color: "#7ab0cc", whiteSpace: "nowrap" }}>{pr.phone || "—"}</td>
-                      <td style={{ padding: "12px 14px", fontSize: 13, color: "#7ab0cc" }}>{pr.territory || pr.country || "—"}</td>
-                      <td style={{ padding: "12px 14px", fontSize: 14, fontWeight: 600, color: "#ffffff" }}>{pr.leadCount}</td>
-                      <td style={{ padding: "12px 14px", fontSize: 14, fontWeight: 600, color: pr.commissionEarned > 0 ? "#e8c547" : "#5a7a90" }}>
-                        {pr.commissionEarned > 0 ? `USD ${pr.commissionEarned.toFixed(2)}` : "—"}
-                      </td>
-                    </tr>
-                  ))}
+                        </td>
+                        <td style={{ padding: "12px 14px" }}>
+                          <span style={{ fontSize: 12, fontWeight: 600, background: pr.isSubPartner ? "rgba(100,160,220,0.18)" : "rgba(80,180,140,0.12)", color: pr.isSubPartner ? "#5ab0f0" : "#35c080", padding: "2px 9px", borderRadius: 20 }}>
+                            {pr.isSubPartner ? "sub-partner" : (pr.type || "promotor")}
+                          </span>
+                        </td>
+                        <td style={{ padding: "12px 14px", fontSize: 13, color: "#7ab0cc" }}>{pr.email || "—"}</td>
+                        <td style={{ padding: "12px 14px", fontSize: 13, color: "#7ab0cc", whiteSpace: "nowrap" }}>{pr.phone || "—"}</td>
+                        <td style={{ padding: "12px 14px", fontSize: 13, color: "#7ab0cc" }}>{pr.territory || pr.country || "—"}</td>
+                        <td style={{ padding: "12px 14px" }}>
+                          <span style={{ fontSize: 12, fontWeight: 700, background: sc.bg, color: sc.color, padding: "3px 10px", borderRadius: 20, textTransform: "capitalize", whiteSpace: "nowrap" }}>
+                            {pr.status || "—"}
+                          </span>
+                        </td>
+                        <td style={{ padding: "12px 14px", fontSize: 14, fontWeight: 600, color: "#ffffff" }}>{pr.leadCount}</td>
+                        <td style={{ padding: "12px 14px", fontSize: 14, fontWeight: 600, color: pr.commissionEarned > 0 ? "#e8c547" : "#5a7a90" }}>
+                          {pr.commissionEarned > 0 ? `USD ${pr.commissionEarned.toFixed(2)}` : "—"}
+                        </td>
+                        <td style={{ padding: "12px 14px" }}>
+                          {!pr.isSubPartner && isPending && (
+                            <div style={{ display: "flex", gap: 6 }}>
+                              <button
+                                onClick={e => { e.stopPropagation(); updatePromotorStatus(pr.id, "active"); }}
+                                disabled={isBusy}
+                                style={{ padding: "4px 12px", borderRadius: 7, border: "1px solid rgba(40,180,80,0.4)", background: "rgba(40,180,80,0.12)", color: "#35c060", fontSize: 12, fontWeight: 700, cursor: isBusy ? "default" : "pointer", whiteSpace: "nowrap" }}>
+                                {isBusy ? "…" : "Approve"}
+                              </button>
+                              <button
+                                onClick={e => { e.stopPropagation(); updatePromotorStatus(pr.id, "rejected"); }}
+                                disabled={isBusy}
+                                style={{ padding: "4px 12px", borderRadius: 7, border: "1px solid rgba(220,80,80,0.4)", background: "rgba(220,80,80,0.1)", color: "#f07070", fontSize: 12, fontWeight: 700, cursor: isBusy ? "default" : "pointer", whiteSpace: "nowrap" }}>
+                                {isBusy ? "…" : "Reject"}
+                              </button>
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

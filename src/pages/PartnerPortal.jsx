@@ -1,77 +1,120 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { supabase } from "../lib/supabase";
 
-const DEFAULT_CHECKLIST = [
-  { item_key: "platform_overview", label: "Review platform overview", sort_order: 0 },
-  { item_key: "onboarding_video", label: "Watch onboarding video", sort_order: 1 },
-  { item_key: "commission_structure", label: "Read commission structure", sort_order: 2 },
-  { item_key: "intro_call", label: "Schedule intro call with admin", sort_order: 3 },
-  { item_key: "target_businesses", label: "Identify 3 target businesses", sort_order: 4 },
+const CHECKLIST_ITEMS = [
+  {
+    item_key: "platform_overview",
+    label: "Review platform overview",
+    section: "training",
+  },
+  {
+    item_key: "commission_structure",
+    label: "Understand commission structure",
+    section: "training",
+  },
+  {
+    item_key: "demo_links",
+    label: "Review demo links",
+    section: "home",
+  },
+  {
+    item_key: "sales_materials",
+    label: "Review sales materials",
+    section: "materials",
+  },
+  {
+    item_key: "target_businesses",
+    label: "Identify 3 target businesses",
+    section: "leads",
+  },
 ];
 
-const emptyLead = { business_name: "", owner_name: "", phone: "", country: "", notes: "" };
+const DEFAULT_TRAINING = [
+  {
+    id: "platform-overview",
+    title: "Platform Overview",
+    type: "guide",
+    description:
+      "QRWegn helps restaurants and cafés accept QR orders. QRBooker helps salons and barbershops manage bookings.",
+  },
+  {
+    id: "qrwegn-pitch",
+    title: "How to Pitch QRWegn",
+    type: "sales",
+    description:
+      "Lead with the problem: slow ordering, staff pressure, missed orders, and poor customer flow. Then show scan → order → kitchen.",
+  },
+  {
+    id: "qrbooker-pitch",
+    title: "How to Pitch QRBooker",
+    type: "sales",
+    description:
+      "Focus on appointment control, barber/chair schedules, fewer missed calls, and cleaner customer booking.",
+  },
+  {
+    id: "commission-structure",
+    title: "Commission Structure",
+    type: "money",
+    description:
+      "Commissions are based on the business plan, monthly value, partner percentage, promotor percentage, and payout records.",
+  },
+  {
+    id: "demo-links-guide",
+    title: "Where Demo Links Live",
+    type: "demo",
+    description:
+      "Demo links are shown on the Home page. Use them to show prospects live examples before they commit.",
+  },
+];
+
+const DEFAULT_MATERIALS = [
+  {
+    id: "restaurant-one-pager",
+    title: "Restaurant Pitch One-Pager",
+    type: "pitch",
+    description:
+      "Simple talking points for restaurants, cafés, hotels, and food courts.",
+  },
+  {
+    id: "barber-one-pager",
+    title: "Barbershop Pitch One-Pager",
+    type: "pitch",
+    description:
+      "Simple talking points for barbershops, salons, beauty shops, and appointment-based businesses.",
+  },
+  {
+    id: "whatsapp-script",
+    title: "WhatsApp Outreach Script",
+    type: "script",
+    description:
+      "Short message a partner or promotor can send to a business owner.",
+  },
+  {
+    id: "facebook-copy",
+    title: "Facebook / Social Copy",
+    type: "social",
+    description:
+      "Ready-to-edit post copy for promoting QRWegn and QRBooker online.",
+  },
+];
+
+const emptyLead = {
+  business_name: "",
+  owner_name: "",
+  phone: "",
+  country: "",
+  notes: "",
+};
 
 const BASE_TABS = [
-  { id: "home",         label: "Home" },
-  { id: "profile",      label: "My Profile" },
+  { id: "home", label: "Home" },
+  { id: "profile", label: "My Profile" },
   { id: "my-promotors", label: "My Promotors" },
-  { id: "commissions",  label: "Commissions" },
-  { id: "training",     label: "Training" },
-  { id: "materials",    label: "Materials" },
-  { id: "leads",        label: "Submit Lead" },
+  { id: "commissions", label: "Commissions" },
+  { id: "training", label: "Training" },
+  { id: "materials", label: "Materials" },
+  { id: "leads", label: "Submit Lead" },
 ];
-
-const STAGE_COLORS = {
-  Identified: "#5ab0f0",
-  Contacted:  "#5aaae0",
-  Interested: "#35c080",
-  Evaluating: "#f0c040",
-  Onboarding: "#c080f0",
-  Active:     "#35c060",
-  Stalled:    "#e0a030",
-  Declined:   "#f07070",
-};
-
-const StagePill = ({ stage }) => {
-  const color = STAGE_COLORS[stage] || STAGE_COLORS.Identified;
-  return (
-    <span style={{
-      fontSize: 11, fontWeight: 700, color,
-      background: `${color}18`,
-      border: `1px solid ${color}33`,
-      padding: "2px 9px", borderRadius: 20,
-    }}>{stage || "Identified"}</span>
-  );
-};
-
-const Card = ({ children, style = {} }) => (
-  <div style={{
-    background: "rgba(10,20,45,0.95)",
-    backdropFilter: "blur(16px)",
-    borderRadius: 16,
-    border: "1px solid rgba(50,80,140,0.3)",
-    boxShadow: "0 4px 28px rgba(0,0,0,0.35)",
-    padding: "24px",
-    ...style,
-  }}>{children}</div>
-);
-
-const SectionLabel = ({ children }) => (
-  <div style={{ fontSize: 11, fontWeight: 700, color: "#4a7090", letterSpacing: "0.12em", marginBottom: 16 }}>
-    {children}
-  </div>
-);
-
-const FieldRow = ({ label, value }) => (
-  <div style={{ display: "flex", padding: "14px 0", borderBottom: "1px solid rgba(50,80,140,0.18)" }}>
-    <div style={{ width: 130, fontSize: 11, fontWeight: 700, color: "#4a7090", letterSpacing: "0.07em", flexShrink: 0, paddingTop: 1 }}>
-      {label.toUpperCase()}
-    </div>
-    <div style={{ fontSize: 14, color: value ? "#c0d8e8" : "#3a5a6a", fontStyle: value ? "normal" : "italic" }}>
-      {value || "Not set"}
-    </div>
-  </div>
-);
 
 const inputStyle = {
   width: "100%",
@@ -85,123 +128,302 @@ const inputStyle = {
   boxSizing: "border-box",
 };
 
+const Card = ({ children, style = {} }) => (
+  <div
+    style={{
+      background: "rgba(10,20,45,0.95)",
+      backdropFilter: "blur(16px)",
+      borderRadius: 16,
+      border: "1px solid rgba(50,80,140,0.3)",
+      boxShadow: "0 4px 28px rgba(0,0,0,0.35)",
+      padding: 24,
+      ...style,
+    }}
+  >
+    {children}
+  </div>
+);
+
+const SectionLabel = ({ children }) => (
+  <div
+    style={{
+      fontSize: 11,
+      fontWeight: 700,
+      color: "#4a7090",
+      letterSpacing: "0.12em",
+      marginBottom: 16,
+    }}
+  >
+    {children}
+  </div>
+);
+
+const FieldRow = ({ label, value }) => (
+  <div
+    style={{
+      display: "flex",
+      padding: "14px 0",
+      borderBottom: "1px solid rgba(50,80,140,0.18)",
+    }}
+  >
+    <div
+      style={{
+        width: 130,
+        fontSize: 11,
+        fontWeight: 700,
+        color: "#4a7090",
+        letterSpacing: "0.07em",
+        flexShrink: 0,
+      }}
+    >
+      {label.toUpperCase()}
+    </div>
+    <div
+      style={{
+        fontSize: 14,
+        color: value ? "#c0d8e8" : "#3a5a6a",
+        fontStyle: value ? "normal" : "italic",
+      }}
+    >
+      {value || "Not set"}
+    </div>
+  </div>
+);
+
 export default function PartnerPortal({ profile, onLogout }) {
   const [tab, setTab] = useState("home");
-  const [checklist, setChecklist] = useState([]);
+  const [checklist, setChecklist] = useState(
+    CHECKLIST_ITEMS.map((item) => ({ ...item, completed: false }))
+  );
   const [promotors, setPromotors] = useState([]);
-  const [commissions, setCommissions] = useState([]);
-  const [commissionsUnavailable, setCommissionsUnavailable] = useState(false);
-  const [materials, setMaterials] = useState([]);
-  const [training, setTraining] = useState([]);
+  const [materials, setMaterials] = useState(DEFAULT_MATERIALS);
+  const [training, setTraining] = useState(DEFAULT_TRAINING);
   const [lead, setLead] = useState(emptyLead);
   const [leadSaving, setLeadSaving] = useState(false);
   const [leadSuccess, setLeadSuccess] = useState(false);
   const [leadError, setLeadError] = useState("");
   const [loading, setLoading] = useState(true);
-  const [recruitForm,    setRecruitForm]    = useState({ full_name: "", email: "", phone: "", country: "", type: "individual" });
-  const [recruitSaving,  setRecruitSaving]  = useState(false);
+  const [recruitForm, setRecruitForm] = useState({
+    full_name: "",
+    email: "",
+    phone: "",
+    country: "",
+    type: "individual",
+  });
+  const [recruitSaving, setRecruitSaving] = useState(false);
   const [recruitSuccess, setRecruitSuccess] = useState(false);
-  const [recruitError,   setRecruitError]   = useState("");
+  const [recruitError, setRecruitError] = useState("");
   const [showRecruitForm, setShowRecruitForm] = useState(false);
-  const [myLeads,         setMyLeads]         = useState([]);
-  const [myPayouts,       setMyPayouts]       = useState([]);
-  const [demoLinks,       setDemoLinks]       = useState([]);
+  const [myLeads, setMyLeads] = useState([]);
+  const [myPayouts, setMyPayouts] = useState([]);
+  const [demoLinks, setDemoLinks] = useState([]);
 
-  useEffect(() => { init(); loadPromotors(); loadMyLeads(); loadMyPayouts(); loadDemoLinks(); }, []);
+  useEffect(() => {
+    loadAll();
+  }, []);
 
-  const init = () => {
-    setChecklist(DEFAULT_CHECKLIST.map(item => ({ ...item, done: false })));
+  const loadAll = async () => {
+    setLoading(true);
+    await Promise.all([
+      loadChecklist(),
+      loadPromotors(),
+      loadMyLeads(),
+      loadMyPayouts(),
+      loadDemoLinks(),
+      loadTraining(),
+      loadMaterials(),
+    ]);
     setLoading(false);
   };
 
-  const loadMyLeads = () => {
-    supabase.from("leads").select("*").order("created_at", { ascending: false }).then(({ data, error }) => {
-      if (!error) setMyLeads(data || []);
-    });
+  const getCurrentUserId = async () => {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    return user?.id || profile?.id || null;
   };
 
-  const loadMyPayouts = () => {
-    supabase.from("payouts").select("*").order("paid_on", { ascending: false }).then(({ data, error }) => {
-      if (!error) setMyPayouts(data || []);
-    });
+  const loadChecklist = async () => {
+    const userId = await getCurrentUserId();
+    if (!userId) return;
+
+    const { data, error } = await supabase
+      .from("partner_checklist_progress")
+      .select("item_key, completed")
+      .eq("user_id", userId);
+
+    if (error) {
+      console.warn("Checklist progress table not ready:", error.message);
+      return;
+    }
+
+    setChecklist(
+      CHECKLIST_ITEMS.map((item) => {
+        const found = data?.find((row) => row.item_key === item.item_key);
+        return { ...item, completed: Boolean(found?.completed) };
+      })
+    );
   };
 
-  const loadDemoLinks = () => {
-    supabase.from("demo_links").select("*").order("created_at", { ascending: false }).then(({ data, error }) => {
-      if (!error) setDemoLinks(data || []);
-    });
-  };
+  const toggleCheck = async (item) => {
+    const userId = await getCurrentUserId();
+    if (!userId) return;
 
-  const loadPromotors = async () => {
-    try {
-      const { data, error } = await supabase
-        .from("promotors").select("*").order("created_at", { ascending: false });
-      if (!error) setPromotors(data || []);
-    } catch (e) {
-      console.warn("promotors fetch failed:", e);
+    const newCompleted = !item.completed;
+
+    setChecklist((current) =>
+      current.map((row) =>
+        row.item_key === item.item_key
+          ? { ...row, completed: newCompleted }
+          : row
+      )
+    );
+
+    const { error } = await supabase.from("partner_checklist_progress").upsert(
+      {
+        user_id: userId,
+        item_key: item.item_key,
+        completed: newCompleted,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "user_id,item_key" }
+    );
+
+    if (error) {
+      console.error("Checklist save failed:", error.message);
     }
   };
 
+  const loadTraining = async () => {
+    const { data, error } = await supabase
+      .from("training_content")
+      .select("*")
+      .order("sort_order", { ascending: true });
+
+    if (!error && data?.length) {
+      setTraining(data);
+    }
+  };
+
+  const loadMaterials = async () => {
+    const { data, error } = await supabase
+      .from("sales_materials")
+      .select("*")
+      .order("created_at", { ascending: false });
+
+    if (!error && data?.length) {
+      setMaterials(data);
+    }
+  };
+
+  const loadMyLeads = async () => {
+    const { data, error } = await supabase
+      .from("leads")
+      .select("*")
+      .order("created_at", { ascending: false });
+
+    if (!error) setMyLeads(data || []);
+  };
+
+  const loadMyPayouts = async () => {
+    const { data, error } = await supabase
+      .from("payouts")
+      .select("*")
+      .order("paid_on", { ascending: false });
+
+    if (!error) setMyPayouts(data || []);
+  };
+
+  const loadDemoLinks = async () => {
+    const { data, error } = await supabase
+      .from("demo_links")
+      .select("*")
+      .order("created_at", { ascending: false });
+
+    if (!error) setDemoLinks(data || []);
+  };
+
+  const loadPromotors = async () => {
+    const { data, error } = await supabase
+      .from("promotors")
+      .select("*")
+      .order("created_at", { ascending: false });
+
+    if (!error) setPromotors(data || []);
+  };
+
   const recruitPromotor = async () => {
-    if (!recruitForm.full_name.trim() || !profile?.id) return;
+    if (!recruitForm.full_name.trim()) return;
+
     setRecruitSaving(true);
     setRecruitError("");
 
-    const { data: { user } } = await supabase.auth.getUser();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
     const { data: profileRow } = await supabase
-      .from("profiles").select("partner_id").eq("id", user.id).single();
+      .from("profiles")
+      .select("partner_id")
+      .eq("id", user.id)
+      .single();
 
     if (!profileRow?.partner_id) {
       setRecruitSaving(false);
-      setRecruitError("Your account isn't linked to a partner record. Contact admin.");
+      setRecruitError("Your account is not linked to a partner record.");
       return;
     }
 
     const { error } = await supabase.from("promotors").insert({
       partner_id: profileRow.partner_id,
-      full_name:  recruitForm.full_name.trim(),
-      email:      recruitForm.email.trim()   || null,
-      phone:      recruitForm.phone.trim()   || null,
-      country:    recruitForm.country.trim() || null,
-      type:       recruitForm.type           || "individual",
-      status:     "active",
+      full_name: recruitForm.full_name.trim(),
+      email: recruitForm.email.trim() || null,
+      phone: recruitForm.phone.trim() || null,
+      country: recruitForm.country.trim() || null,
+      type: recruitForm.type || "individual",
+      status: "active",
     });
+
     setRecruitSaving(false);
+
     if (error) {
-      console.error("recruitPromotor error:", error);
-      setRecruitError(error.message || "Failed to add promotor. Please try again.");
+      setRecruitError(error.message || "Failed to add promotor.");
       return;
     }
-    setRecruitForm({ full_name: "", email: "", phone: "", country: "", type: "individual" });
+
+    setRecruitForm({
+      full_name: "",
+      email: "",
+      phone: "",
+      country: "",
+      type: "individual",
+    });
     setShowRecruitForm(false);
     setRecruitSuccess(true);
     setTimeout(() => setRecruitSuccess(false), 3500);
     loadPromotors();
   };
 
-  const toggleCheck = async (item) => {
-    const newDone = !item.done;
-    setChecklist(c => c.map(x => x.id === item.id ? { ...x, done: newDone } : x));
-    await supabase.from("partner_checklist").update({ done: newDone }).eq("id", item.id);
-  };
-
-  const doneCount = checklist.filter(c => c.done).length;
-  const totalCount = checklist.length;
-  const pct = totalCount > 0 ? Math.round((doneCount / totalCount) * 100) : 0;
-
   const submitLead = async () => {
-    if (!lead.business_name.trim() || !profile?.id) return;
+    if (!lead.business_name.trim()) return;
+
     setLeadSaving(true);
     setLeadError("");
 
-    // Fetch partner_id fresh so we never rely on potentially-stale state.
-    const { data: { user } } = await supabase.auth.getUser();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
     const { data: profileRow } = await supabase
-      .from("profiles").select("partner_id").eq("id", user.id).single();
+      .from("profiles")
+      .select("partner_id")
+      .eq("id", user.id)
+      .single();
 
     if (!profileRow?.partner_id) {
       setLeadSaving(false);
-      setLeadError("Your account isn't linked to a partner record. Contact admin.");
+      setLeadError("Your account is not linked to a partner record.");
       return;
     }
 
@@ -213,546 +435,1139 @@ export default function PartnerPortal({ profile, onLogout }) {
       country: lead.country.trim(),
       notes: lead.notes.trim(),
     });
+
     setLeadSaving(false);
+
     if (error) {
-      console.error("submitLead error:", error);
-      setLeadError(error.message || "Failed to submit lead. Please try again.");
+      setLeadError(error.message || "Failed to submit lead.");
       return;
     }
+
     setLead(emptyLead);
     setLeadSuccess(true);
     setTimeout(() => setLeadSuccess(false), 3500);
+    loadMyLeads();
   };
 
+  const doneCount = checklist.filter((item) => item.completed).length;
+  const totalCount = checklist.length;
+  const pct = totalCount > 0 ? Math.round((doneCount / totalCount) * 100) : 0;
+
+  const earningRows = useMemo(() => {
+    const earningStatuses = ["signed", "active"];
+    const owedByCurrency = {};
+    const paidByCurrency = {};
+
+    myLeads.forEach((leadRow) => {
+      if (!earningStatuses.includes(leadRow.status)) return;
+      if (leadRow.monthly_value == null || leadRow.partner_pct == null) return;
+
+      const currency = leadRow.currency || "USD";
+      owedByCurrency[currency] =
+        (owedByCurrency[currency] || 0) +
+        (Number(leadRow.monthly_value) * Number(leadRow.partner_pct)) / 100;
+    });
+
+    myPayouts.forEach((payout) => {
+      const currency = payout.currency || "USD";
+      paidByCurrency[currency] =
+        (paidByCurrency[currency] || 0) + Number(payout.amount || 0);
+    });
+
+    const currencies = [
+      ...new Set([...Object.keys(owedByCurrency), ...Object.keys(paidByCurrency)]),
+    ];
+
+    return currencies.map((currency) => ({
+      currency,
+      owed: owedByCurrency[currency] || 0,
+      paid: paidByCurrency[currency] || 0,
+      balance:
+        (owedByCurrency[currency] || 0) - (paidByCurrency[currency] || 0),
+    }));
+  }, [myLeads, myPayouts]);
+
   const initials = profile?.full_name
-    ? profile.full_name.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase()
+    ? profile.full_name
+        .split(" ")
+        .map((name) => name[0])
+        .join("")
+        .slice(0, 2)
+        .toUpperCase()
     : "P";
 
   const firstName = profile?.full_name?.split(" ")[0] || "Partner";
 
   if (loading) {
     return (
-      <div style={{ minHeight: "100vh", background: "linear-gradient(160deg, #050d1a 0%, #0a1525 50%, #060e1c 100%)", display: "flex", alignItems: "center", justifyContent: "center", color: "#4a7090", fontSize: 15 }}>
-        Loading your portal&hellip;
+      <div
+        style={{
+          minHeight: "100vh",
+          background:
+            "linear-gradient(160deg, #050d1a 0%, #0a1525 50%, #060e1c 100%)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          color: "#4a7090",
+          fontSize: 15,
+        }}
+      >
+        Loading your portal...
       </div>
     );
   }
 
   return (
-    <div style={{ minHeight: "100vh", background: "linear-gradient(160deg, #050d1a 0%, #0a1525 25%, #0d1a30 50%, #081020 75%, #060e1c 100%)", fontFamily: "system-ui, -apple-system, sans-serif" }}>
-      {/* Background orbs */}
-      <div style={{ position: "fixed", top: -100, right: -100, width: 500, height: 500, borderRadius: "50%", background: "rgba(30,60,120,0.1)", pointerEvents: "none", zIndex: 0 }} />
-      <div style={{ position: "fixed", bottom: -80, left: -80, width: 400, height: 400, borderRadius: "50%", background: "rgba(20,50,100,0.08)", pointerEvents: "none", zIndex: 0 }} />
-
-      {/* Topbar */}
-      <div style={{ background: "rgba(6,12,30,0.97)", backdropFilter: "blur(20px)", borderBottom: "1px solid rgba(50,80,140,0.3)", padding: "0 24px", display: "flex", alignItems: "center", justifyContent: "space-between", position: "sticky", top: 0, zIndex: 100, height: 58 }}>
+    <div
+      style={{
+        minHeight: "100vh",
+        background:
+          "linear-gradient(160deg, #050d1a 0%, #0a1525 25%, #0d1a30 50%, #081020 75%, #060e1c 100%)",
+        fontFamily: "system-ui, -apple-system, sans-serif",
+      }}
+    >
+      <div
+        style={{
+          background: "rgba(6,12,30,0.97)",
+          backdropFilter: "blur(20px)",
+          borderBottom: "1px solid rgba(50,80,140,0.3)",
+          padding: "0 24px",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          position: "sticky",
+          top: 0,
+          zIndex: 100,
+          height: 58,
+        }}
+      >
         <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
           <img src="/Logo.png" alt="QR-Wegn" style={{ height: 30 }} />
-          <span style={{ fontSize: 11, color: "#3a5a70", fontWeight: 700, letterSpacing: "0.12em" }}>PARTNER PORTAL</span>
+          <span
+            style={{
+              fontSize: 11,
+              color: "#3a5a70",
+              fontWeight: 700,
+              letterSpacing: "0.12em",
+            }}
+          >
+            PARTNER PORTAL
+          </span>
         </div>
+
         <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
           <div style={{ textAlign: "right" }}>
-            <div style={{ fontSize: 13, color: "#b0cce0", fontWeight: 600, lineHeight: 1.2 }}>{profile?.full_name || "Partner"}</div>
-            <div style={{ fontSize: 11, color: "#3a5a70", textTransform: "capitalize" }}>{profile?.role || "Partner"}</div>
+            <div
+              style={{
+                fontSize: 13,
+                color: "#b0cce0",
+                fontWeight: 600,
+                lineHeight: 1.2,
+              }}
+            >
+              {profile?.full_name || "Partner"}
+            </div>
+            <div
+              style={{
+                fontSize: 11,
+                color: "#3a5a70",
+                textTransform: "capitalize",
+              }}
+            >
+              {profile?.role || "Partner"}
+            </div>
           </div>
-          <div style={{ width: 32, height: 32, borderRadius: "50%", background: "linear-gradient(135deg, #1a3a6a, #0d2045)", border: "1.5px solid rgba(80,140,200,0.35)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 700, color: "#5ab0f0", flexShrink: 0 }}>
+
+          <div
+            style={{
+              width: 32,
+              height: 32,
+              borderRadius: "50%",
+              background: "linear-gradient(135deg, #1a3a6a, #0d2045)",
+              border: "1.5px solid rgba(80,140,200,0.35)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: 12,
+              fontWeight: 700,
+              color: "#5ab0f0",
+            }}
+          >
             {initials}
           </div>
-          <button onClick={onLogout} style={{ fontSize: 12, color: "#3a5a70", background: "none", border: "none", cursor: "pointer", padding: "6px 0", fontWeight: 500 }}>Sign out</button>
+
+          <button
+            onClick={onLogout}
+            style={{
+              fontSize: 12,
+              color: "#3a5a70",
+              background: "none",
+              border: "none",
+              cursor: "pointer",
+              padding: "6px 0",
+              fontWeight: 500,
+            }}
+          >
+            Sign out
+          </button>
         </div>
       </div>
 
-      <div style={{ maxWidth: 960, margin: "0 auto", padding: "28px 20px 48px", position: "relative", zIndex: 1 }}>
-
-        {/* Welcome */}
+      <div
+        style={{
+          maxWidth: 960,
+          margin: "0 auto",
+          padding: "28px 20px 48px",
+        }}
+      >
         <div style={{ marginBottom: 20 }}>
-          <h1 style={{ fontSize: 26, fontWeight: 700, color: "#ffffff", margin: 0, letterSpacing: "-0.01em" }}>Welcome back, {firstName}</h1>
+          <h1
+            style={{
+              fontSize: 26,
+              fontWeight: 700,
+              color: "#ffffff",
+              margin: 0,
+            }}
+          >
+            Welcome back, {firstName}
+          </h1>
           <p style={{ fontSize: 14, color: "#4a7090", margin: "5px 0 0" }}>
-            {profile?.region ? `${profile.region} · ` : ""}
-            <span style={{ textTransform: "capitalize" }}>{profile?.role || "Partner"}</span>
+            {profile?.region ? `${profile.region} · ` : ""}
+            <span style={{ textTransform: "capitalize" }}>
+              {profile?.role || "Partner"}
+            </span>
           </p>
         </div>
 
-        {/* Status banner */}
-        <div style={{ background: "rgba(232,197,71,0.08)", border: "1px solid rgba(232,197,71,0.22)", borderRadius: 12, padding: "13px 18px", marginBottom: 22, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+        <div
+          style={{
+            background: "rgba(232,197,71,0.08)",
+            border: "1px solid rgba(232,197,71,0.22)",
+            borderRadius: 12,
+            padding: "13px 18px",
+            marginBottom: 22,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 12,
+          }}
+        >
           <div>
-            <div style={{ fontSize: 14, fontWeight: 600, color: "#e8c547" }}>Onboarding in progress</div>
-            <div style={{ fontSize: 12, color: "#8a7030", marginTop: 2 }}>Complete your checklist to become an active partner</div>
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
-            <div style={{ width: 90, height: 5, background: "rgba(232,197,71,0.18)", borderRadius: 3, overflow: "hidden" }}>
-              <div style={{ height: "100%", width: `${pct}%`, background: "linear-gradient(90deg, #e8c547, #c9a832)", borderRadius: 3, transition: "width 0.4s ease" }} />
+            <div style={{ fontSize: 14, fontWeight: 600, color: "#e8c547" }}>
+              Onboarding progress
             </div>
-            <span style={{ fontSize: 16, fontWeight: 700, color: "#e8c547", minWidth: 36, textAlign: "right" }}>{pct}%</span>
+            <div style={{ fontSize: 12, color: "#8a7030", marginTop: 2 }}>
+              Complete the checklist to become fully ready for outreach.
+            </div>
+          </div>
+
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 10,
+              flexShrink: 0,
+            }}
+          >
+            <div
+              style={{
+                width: 90,
+                height: 5,
+                background: "rgba(232,197,71,0.18)",
+                borderRadius: 3,
+                overflow: "hidden",
+              }}
+            >
+              <div
+                style={{
+                  height: "100%",
+                  width: `${pct}%`,
+                  background: "linear-gradient(90deg, #e8c547, #c9a832)",
+                  borderRadius: 3,
+                }}
+              />
+            </div>
+            <span
+              style={{
+                fontSize: 16,
+                fontWeight: 700,
+                color: "#e8c547",
+                minWidth: 36,
+                textAlign: "right",
+              }}
+            >
+              {pct}%
+            </span>
           </div>
         </div>
 
-        {/* Tabs */}
-        <div style={{ display: "flex", gap: 2, marginBottom: 22, background: "rgba(4,10,24,0.85)", borderRadius: 10, padding: 3, width: "fit-content", flexWrap: "wrap" }}>
-          {BASE_TABS.map(t => (
-            <button key={t.id} onClick={() => setTab(t.id)} style={{
-              padding: "7px 15px", borderRadius: 8, border: "none", cursor: "pointer",
-              background: tab === t.id ? "rgba(80,140,210,0.22)" : "transparent",
-              color: tab === t.id ? "#8fd0ff" : "#3a5a70",
-              fontSize: 13, fontWeight: tab === t.id ? 700 : 500,
-              boxShadow: tab === t.id ? "inset 0 0 0 1px rgba(80,140,210,0.28)" : "none",
-              transition: "all 0.15s",
-            }}>{t.label}</button>
+        <div
+          style={{
+            display: "flex",
+            gap: 2,
+            marginBottom: 22,
+            background: "rgba(4,10,24,0.85)",
+            borderRadius: 10,
+            padding: 3,
+            width: "fit-content",
+            flexWrap: "wrap",
+          }}
+        >
+          {BASE_TABS.map((item) => (
+            <button
+              key={item.id}
+              onClick={() => setTab(item.id)}
+              style={{
+                padding: "7px 15px",
+                borderRadius: 8,
+                border: "none",
+                cursor: "pointer",
+                background:
+                  tab === item.id ? "rgba(80,140,210,0.22)" : "transparent",
+                color: tab === item.id ? "#8fd0ff" : "#3a5a70",
+                fontSize: 13,
+                fontWeight: tab === item.id ? 700 : 500,
+              }}
+            >
+              {item.label}
+            </button>
           ))}
         </div>
 
-        {/* HOME */}
         {tab === "home" && (
           <div>
-          {(() => {
-            const EARNING_STATUSES = ["signed", "active"];
-            const owedByCurrency = {};
-            myLeads.forEach(l => {
-              if (!EARNING_STATUSES.includes(l.status)) return;
-              if (l.monthly_value == null || l.partner_pct == null) return;
-              const cur = l.currency || "USD";
-              owedByCurrency[cur] = (owedByCurrency[cur] || 0) + l.monthly_value * l.partner_pct / 100;
-            });
-            const paidByCurrency = {};
-            myPayouts.forEach(p => {
-              const cur = p.currency || "USD";
-              paidByCurrency[cur] = (paidByCurrency[cur] || 0) + Number(p.amount);
-            });
-            const allCurrencies = [...new Set([...Object.keys(owedByCurrency), ...Object.keys(paidByCurrency)])];
-            const earningRows = allCurrencies.map(cur => ({
-              currency: cur,
-              owed: owedByCurrency[cur] || 0,
-              paid: paidByCurrency[cur] || 0,
-              balance: (owedByCurrency[cur] || 0) - (paidByCurrency[cur] || 0),
-            }));
-            return (
-              <Card style={{ marginBottom: 16 }}>
-                <SectionLabel>MY EARNINGS</SectionLabel>
-                {earningRows.length === 0 ? (
-                  <p style={{ fontSize: 14, color: "#3a5a70", margin: 0 }}>No earnings yet.</p>
-                ) : (
-                  <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                    <thead>
-                      <tr style={{ borderBottom: "1px solid rgba(50,80,140,0.35)" }}>
-                        {["Currency", "Owed", "Paid", "Balance"].map(h => (
-                          <th key={h} style={{ padding: "7px 12px", textAlign: "left", fontSize: 11, color: "#4a7090", fontWeight: 700, letterSpacing: "0.08em" }}>
-                            {h.toUpperCase()}
-                          </th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {earningRows.map(r => {
-                        const balanceColor = r.balance > 0 ? "#e8c547" : "#7ac77a";
-                        return (
-                          <tr key={r.currency} style={{ borderBottom: "1px solid rgba(50,80,140,0.14)" }}>
-                            <td style={{ padding: "10px 12px", fontSize: 13, color: "#7ab0cc" }}>{r.currency}</td>
-                            <td style={{ padding: "10px 12px", fontSize: 13, color: "#a0c8e8", whiteSpace: "nowrap" }}>{r.currency} {r.owed.toFixed(2)}</td>
-                            <td style={{ padding: "10px 12px", fontSize: 13, color: "#a0c8e8", whiteSpace: "nowrap" }}>{r.currency} {r.paid.toFixed(2)}</td>
-                            <td style={{ padding: "10px 12px", fontSize: 14, fontWeight: 700, color: balanceColor, whiteSpace: "nowrap" }}>{r.currency} {r.balance.toFixed(2)}</td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                )}
-              </Card>
-            );
-          })()}
-          <Card style={{ marginBottom: 16 }}>
-            <SectionLabel>DEMO LINKS</SectionLabel>
-            <p style={{ fontSize: 13, color: "#4a7090", marginTop: -8, marginBottom: 14 }}>Open or share these with prospects.</p>
-            {demoLinks.length === 0 ? (
-              <p style={{ fontSize: 14, color: "#3a5a70", margin: 0 }}>No demos available yet.</p>
-            ) : demoLinks.map(d => (
-              <div key={d.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 0", borderBottom: "1px solid rgba(50,80,140,0.18)", gap: 12 }}>
-                <div style={{ minWidth: 0 }}>
-                  <div style={{ fontSize: 14, fontWeight: 700, color: "#c0d8e8" }}>{d.name}</div>
-                  {d.description && <div style={{ fontSize: 12, color: "#4a7090", marginTop: 2 }}>{d.description}</div>}
-                </div>
-                <a href={d.url} target="_blank" rel="noreferrer" style={{ fontSize: 13, color: "#5ab0f0", textDecoration: "none", fontWeight: 600, whiteSpace: "nowrap", flexShrink: 0 }}>Open ↗</a>
-              </div>
-            ))}
-          </Card>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 16 }}>
-            <Card>
-              <SectionLabel>ONBOARDING CHECKLIST</SectionLabel>
-              {checklist.map(c => (
-                <div key={c.id} onClick={() => toggleCheck(c)} style={{ display: "flex", alignItems: "center", gap: 12, padding: "11px 0", borderBottom: "1px solid rgba(50,80,140,0.18)", cursor: "pointer", userSelect: "none" }}>
-                  <div style={{
-                    width: 20, height: 20, borderRadius: 5, border: "1.5px solid",
-                    borderColor: c.done ? "#5ab0f0" : "rgba(80,130,180,0.28)",
-                    background: c.done ? "#5ab0f0" : "transparent",
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                    flexShrink: 0, transition: "all 0.15s",
-                  }}>
-                    {c.done && (
-                      <svg width="11" height="9" viewBox="0 0 11 9" fill="none">
-                        <path d="M1 4L4 7L10 1" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                      </svg>
-                    )}
-                  </div>
-                  <span style={{ fontSize: 14, color: c.done ? "#3a5a70" : "#b0cce0", textDecoration: c.done ? "line-through" : "none", lineHeight: 1.4 }}>
-                    {c.label}
-                  </span>
-                </div>
-              ))}
-            </Card>
+            <Card style={{ marginBottom: 16 }}>
+              <SectionLabel>MY EARNINGS</SectionLabel>
 
-            <Card>
-              <SectionLabel>YOUR PROGRESS</SectionLabel>
-              <div style={{ textAlign: "center", padding: "20px 0 12px" }}>
-                <div style={{ fontSize: 54, fontWeight: 800, color: "#5ab0f0", lineHeight: 1 }}>{pct}%</div>
-                <div style={{ fontSize: 13, color: "#3a5a70", marginTop: 6 }}>{doneCount} of {totalCount} tasks complete</div>
-                <div style={{ marginTop: 18, height: 7, background: "rgba(80,130,180,0.12)", borderRadius: 4, overflow: "hidden" }}>
-                  <div style={{ height: "100%", width: `${pct}%`, background: "linear-gradient(90deg, #3a9ad9, #2a7ab8)", borderRadius: 4, transition: "width 0.4s ease" }} />
-                </div>
-              </div>
-              <div style={{ marginTop: 18, padding: "12px 14px", background: "rgba(80,140,210,0.07)", borderRadius: 10, border: "1px solid rgba(80,140,210,0.13)", fontSize: 13, color: "#5a8aaa", lineHeight: 1.65 }}>
-                Complete onboarding to start bringing businesses onto the QR-Wegn platform and earning commissions.
-              </div>
-            </Card>
-          </div>
-          </div>
-        )}
-
-        {/* PROFILE */}
-        {tab === "profile" && (
-          <Card style={{ maxWidth: 540 }}>
-            <SectionLabel>PARTNER INFORMATION</SectionLabel>
-            <div>
-              <FieldRow label="Full Name" value={profile?.full_name} />
-              <FieldRow label="Email" value={profile?.email} />
-              <FieldRow label="Region" value={profile?.region} />
-              <FieldRow label="Phone" value={profile?.phone} />
-              <FieldRow label="Role" value={profile?.role} />
-            </div>
-            <div style={{ marginTop: 18, fontSize: 12, color: "#2a4050", lineHeight: 1.5 }}>
-              To update your profile, contact your QR-Wegn administrator.
-            </div>
-          </Card>
-        )}
-
-        {/* TRAINING */}
-        {tab === "training" && (
-          <Card>
-            <SectionLabel>TRAINING MATERIALS</SectionLabel>
-            {training.length === 0 ? (
-              <div style={{ color: "#3a5a70", fontSize: 14, padding: "24px 0", textAlign: "center" }}>No training materials available yet.</div>
-            ) : training.map(t => (
-              <div key={t.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 0", borderBottom: "1px solid rgba(50,80,140,0.18)", gap: 12 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
-                  <div style={{ width: 36, height: 36, borderRadius: 8, background: "rgba(80,130,180,0.12)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, flexShrink: 0 }}>
-                    {t.type === "video" ? "▶" : "📄"}
-                  </div>
-                  <div style={{ minWidth: 0 }}>
-                    <div style={{ fontSize: 14, fontWeight: 600, color: "#b0cce0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.title}</div>
-                    <div style={{ fontSize: 11, color: "#3a5a70", marginTop: 2, fontWeight: 600, letterSpacing: "0.06em" }}>{(t.type || "FILE").toUpperCase()}</div>
-                  </div>
-                </div>
-                <a href={t.file_url} target="_blank" rel="noreferrer" style={{ fontSize: 13, color: "#5ab0f0", background: "rgba(80,160,230,0.1)", border: "1px solid rgba(80,160,230,0.22)", borderRadius: 7, padding: "5px 13px", textDecoration: "none", fontWeight: 600, flexShrink: 0 }}>Open</a>
-              </div>
-            ))}
-          </Card>
-        )}
-
-        {/* MATERIALS */}
-        {tab === "materials" && (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 14 }}>
-            {materials.length === 0 ? (
-              <div style={{ color: "#3a5a70", fontSize: 14, gridColumn: "1 / -1", textAlign: "center", padding: "48px 0" }}>No outreach materials available yet.</div>
-            ) : materials.map((m) => (
-              <Card key={m.id} style={{ display: "flex", flexDirection: "column" }}>
-                <div style={{ fontSize: 26, marginBottom: 10 }}>
-                  {m.type === "video" ? "🎥" : m.type === "doc" ? "📝" : "📄"}
-                </div>
-                <div style={{ fontSize: 14, fontWeight: 700, color: "#b0cce0", lineHeight: 1.3, marginBottom: 6 }}>{m.title}</div>
-                {m.description && <div style={{ fontSize: 12, color: "#3a5a70", lineHeight: 1.55, marginBottom: 8 }}>{m.description}</div>}
-                <div style={{ marginBottom: 12 }}>
-                  <span style={{ display: "inline-block", fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", color: "#5ab0f0", background: "rgba(80,160,230,0.1)", padding: "3px 9px", borderRadius: 20 }}>
-                    {(m.type || "FILE").toUpperCase()}
-                  </span>
-                </div>
-                <a href={m.file_url} target="_blank" rel="noreferrer" style={{ display: "block", marginTop: "auto", textAlign: "center", padding: "8px 0", borderRadius: 8, background: "rgba(80,160,230,0.12)", border: "1px solid rgba(80,160,230,0.25)", color: "#5ab0f0", fontSize: 13, fontWeight: 600, textDecoration: "none" }}>
-                  Download
-                </a>
-              </Card>
-            ))}
-          </div>
-        )}
-
-        {/* MY PROMOTORS */}
-        {tab === "my-promotors" && (() => {
-          const activeCount = promotors.filter(p => p.status === "active").length;
-
-          return (
-            <div>
-              {/* Summary cards */}
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 12, marginBottom: 24 }}>
-                {[
-                  { label: "Total Promotors",     value: promotors.length, color: "#5ab0f0" },
-                  { label: "Active Promotors",     value: activeCount,      color: "#35c060" },
-                  { label: "Businesses Onboarded", value: 0,                color: "#c080f0" },
-                  { label: "Pending Commissions",  value: "$0",             color: "#e8c547" },
-                ].map(m => (
-                  <Card key={m.label} style={{ padding: "16px 18px" }}>
-                    <div style={{ fontSize: 10, fontWeight: 700, color: "#4a7090", letterSpacing: "0.1em", marginBottom: 8 }}>{m.label.toUpperCase()}</div>
-                    <div style={{ fontSize: 28, fontWeight: 800, color: m.color, lineHeight: 1 }}>{m.value}</div>
-                  </Card>
-                ))}
-              </div>
-
-              {/* Recruit button + success banner */}
-              <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 14 }}>
-                <button
-                  onClick={() => { setShowRecruitForm(f => !f); setRecruitError(""); }}
-                  style={{ padding: "8px 18px", borderRadius: 8, border: "none", cursor: "pointer", background: "rgba(80,160,230,0.18)", color: "#5ab0f0", fontSize: 13, fontWeight: 700 }}
-                >
-                  {showRecruitForm ? "Cancel" : "+ Recruit Promotor"}
-                </button>
-              </div>
-
-              {recruitSuccess && (
-                <div style={{ background: "rgba(40,180,80,0.08)", border: "1px solid rgba(40,180,80,0.22)", borderRadius: 10, padding: "12px 16px", marginBottom: 16, fontSize: 13, color: "#35c060", display: "flex", alignItems: "center", gap: 8 }}>
-                  <svg width="14" height="12" viewBox="0 0 14 12" fill="none"><path d="M1 6L5 10L13 1" stroke="#35c060" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>
-                  Promotor added successfully!
-                </div>
-              )}
-
-              {/* Recruit form */}
-              {showRecruitForm && (
-                <Card style={{ marginBottom: 20 }}>
-                  <SectionLabel>NEW PROMOTOR</SectionLabel>
-                  {recruitError && (
-                    <div style={{ background: "rgba(220,60,60,0.08)", border: "1px solid rgba(220,60,60,0.3)", borderRadius: 10, padding: "10px 14px", marginBottom: 14, fontSize: 13, color: "#f07070" }}>
-                      {recruitError}
-                    </div>
-                  )}
-                  <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                    {[
-                      { key: "full_name", label: "Full Name",    required: true,  placeholder: "e.g. Dawit Haile" },
-                      { key: "email",     label: "Email",        required: false, placeholder: "dawit@example.com" },
-                      { key: "phone",     label: "Phone",        required: false, placeholder: "+251 ..." },
-                      { key: "country",   label: "Country",      required: false, placeholder: "e.g. Ethiopia" },
-                    ].map(({ key, label, required, placeholder }) => (
-                      <div key={key}>
-                        <label style={{ fontSize: 11, fontWeight: 700, color: "#4a7090", letterSpacing: "0.08em", display: "block", marginBottom: 4 }}>
-                          {label.toUpperCase()}{required && <span style={{ color: "#e8c547", marginLeft: 3 }}>*</span>}
-                        </label>
-                        <input
-                          value={recruitForm[key]}
-                          onChange={e => setRecruitForm(f => ({ ...f, [key]: e.target.value }))}
-                          placeholder={placeholder}
-                          style={{ width: "100%", padding: "10px 12px", borderRadius: 8, border: "1px solid rgba(50,80,140,0.3)", background: "rgba(4,10,24,0.85)", color: "#c0d8e8", fontSize: 14, outline: "none", boxSizing: "border-box" }}
-                        />
-                      </div>
-                    ))}
-                    <div>
-                      <label style={{ fontSize: 11, fontWeight: 700, color: "#4a7090", letterSpacing: "0.08em", display: "block", marginBottom: 4 }}>TYPE</label>
-                      <select
-                        value={recruitForm.type}
-                        onChange={e => setRecruitForm(f => ({ ...f, type: e.target.value }))}
-                        style={{ width: "100%", padding: "10px 12px", borderRadius: 8, border: "1px solid rgba(50,80,140,0.3)", background: "rgba(4,10,24,0.85)", color: "#c0d8e8", fontSize: 14, outline: "none", cursor: "pointer" }}
-                      >
-                        <option value="individual">Individual</option>
-                        <option value="business">Business</option>
-                      </select>
-                    </div>
-                    <button
-                      onClick={recruitPromotor}
-                      disabled={recruitSaving || !recruitForm.full_name.trim()}
-                      style={{
-                        padding: "11px 0", borderRadius: 9, border: "none",
-                        background: recruitSaving || !recruitForm.full_name.trim() ? "rgba(80,140,210,0.18)" : "linear-gradient(135deg, #3a9ad9, #2a7ab8)",
-                        color: recruitSaving || !recruitForm.full_name.trim() ? "#3a5a70" : "white",
-                        fontSize: 14, fontWeight: 700,
-                        cursor: recruitSaving || !recruitForm.full_name.trim() ? "default" : "pointer",
-                      }}
-                    >
-                      {recruitSaving ? "Adding…" : "Add Promotor"}
-                    </button>
-                  </div>
-                </Card>
-              )}
-
-              {/* Promotor cards */}
-              {promotors.length === 0 ? (
-                <Card style={{ textAlign: "center", padding: "52px 24px" }}>
-                  <div style={{ fontSize: 36, marginBottom: 14 }}>👥</div>
-                  <div style={{ fontSize: 16, fontWeight: 600, color: "#b0cce0", marginBottom: 8 }}>No promotors yet</div>
-                  <div style={{ fontSize: 13, color: "#4a7090" }}>Use the Recruit Promotor button to add your first one.</div>
-                </Card>
+              {earningRows.length === 0 ? (
+                <p style={{ fontSize: 14, color: "#3a5a70", margin: 0 }}>
+                  No earnings yet.
+                </p>
               ) : (
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 14 }}>
-                  {promotors.map(p => {
-                    const location = [p.city, p.country].filter(Boolean).join(", ") || "—";
-                    return (
-                      <Card key={p.id} style={{ display: "flex", flexDirection: "column", gap: 0 }}>
-                        {/* Header */}
-                        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
-                          <div style={{
-                            width: 42, height: 42, borderRadius: "50%", flexShrink: 0,
-                            background: "linear-gradient(135deg, #1a3a6a, #0d2045)",
-                            border: "1.5px solid rgba(80,140,200,0.3)",
-                            display: "flex", alignItems: "center", justifyContent: "center",
-                            fontSize: 14, fontWeight: 700, color: "#5ab0f0",
-                          }}>
-                            {(p.full_name || "?").split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase()}
-                          </div>
-                          <div style={{ minWidth: 0 }}>
-                            <div style={{ fontSize: 14, fontWeight: 700, color: "#c0d8e8", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.full_name || "—"}</div>
-                            <div style={{ fontSize: 12, color: "#4a7090", marginTop: 2 }}>{location}</div>
-                          </div>
-                        </div>
-
-                        {/* Status + type */}
-                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-                          <span style={{
-                            fontSize: 11, fontWeight: 700, padding: "3px 10px", borderRadius: 20, letterSpacing: "0.06em", textTransform: "capitalize",
-                            background: p.status === "active" ? "rgba(40,180,80,0.12)" : "rgba(100,160,220,0.12)",
-                            color:      p.status === "active" ? "#35c060"              : "#5ab0f0",
-                          }}>{p.status || "active"}</span>
-                          <span style={{ fontSize: 12, color: "#5a8aaa", textTransform: "capitalize" }}>{p.type || "individual"}</span>
-                        </div>
-
-                        {/* Contact stat */}
-                        <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
-                          <div style={{ flex: 1, background: "rgba(80,130,180,0.08)", borderRadius: 8, padding: "8px 10px", textAlign: "center" }}>
-                            <div style={{ fontSize: 16, fontWeight: 700, color: "#35c080" }}>{p.email ? "✓" : "—"}</div>
-                            <div style={{ fontSize: 10, color: "#4a7090", marginTop: 2 }}>EMAIL</div>
-                          </div>
-                          <div style={{ flex: 1, background: "rgba(80,130,180,0.08)", borderRadius: 8, padding: "8px 10px", textAlign: "center" }}>
-                            <div style={{ fontSize: 16, fontWeight: 700, color: "#5ab0f0" }}>{p.phone ? "✓" : "—"}</div>
-                            <div style={{ fontSize: 10, color: "#4a7090", marginTop: 2 }}>PHONE</div>
-                          </div>
-                        </div>
-                      </Card>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          );
-        })()}
-
-        {/* COMMISSIONS */}
-        {tab === "commissions" && (
-          <div>
-            <div style={{ marginBottom: 18 }}>
-              <h2 style={{ fontSize: 18, fontWeight: 700, color: "#ffffff", margin: 0 }}>Commissions</h2>
-              <p style={{ fontSize: 13, color: "#4a7090", margin: "4px 0 0" }}>Your earnings from referred businesses</p>
-            </div>
-
-            {commissionsUnavailable ? (
-              <Card style={{ textAlign: "center", padding: "52px 24px" }}>
-                <div style={{ fontSize: 36, marginBottom: 14 }}>💰</div>
-                <div style={{ fontSize: 15, fontWeight: 600, color: "#b0cce0", marginBottom: 8 }}>Commission tracking coming soon</div>
-                <div style={{ fontSize: 13, color: "#4a7090" }}>Your commission history will appear here once the system is live.</div>
-              </Card>
-            ) : commissions.length === 0 ? (
-              <Card style={{ textAlign: "center", padding: "52px 24px" }}>
-                <div style={{ fontSize: 36, marginBottom: 14 }}>💰</div>
-                <div style={{ fontSize: 15, fontWeight: 600, color: "#b0cce0", marginBottom: 8 }}>No commissions recorded yet</div>
-                <div style={{ fontSize: 13, color: "#4a7090" }}>Commissions will appear here as businesses you referred go live.</div>
-              </Card>
-            ) : (
-              <Card style={{ padding: 0, overflow: "hidden" }}>
                 <table style={{ width: "100%", borderCollapse: "collapse" }}>
                   <thead>
-                    <tr style={{ borderBottom: "1px solid rgba(50,80,140,0.25)" }}>
-                      {["Partner / Promotor", "Business", "Amount", "Status", "Date"].map(h => (
-                        <th key={h} style={{ padding: "12px 20px", textAlign: "left", fontSize: 11, color: "#4a7090", fontWeight: 700, letterSpacing: "0.1em" }}>
-                          {h.toUpperCase()}
+                    <tr
+                      style={{
+                        borderBottom: "1px solid rgba(50,80,140,0.35)",
+                      }}
+                    >
+                      {["Currency", "Owed", "Paid", "Balance"].map((heading) => (
+                        <th
+                          key={heading}
+                          style={{
+                            padding: "7px 12px",
+                            textAlign: "left",
+                            fontSize: 11,
+                            color: "#4a7090",
+                            fontWeight: 700,
+                            letterSpacing: "0.08em",
+                          }}
+                        >
+                          {heading.toUpperCase()}
                         </th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
-                    {commissions.map((c, i) => {
-                      const isPaid = c.status === "paid";
-                      return (
-                        <tr key={c.id}
-                          style={{ borderBottom: i < commissions.length - 1 ? "1px solid rgba(50,80,140,0.15)" : "none", transition: "background 0.1s" }}
-                          onMouseEnter={e => e.currentTarget.style.background = "rgba(80,140,210,0.05)"}
-                          onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
-                          <td style={{ padding: "13px 20px", fontSize: 14, fontWeight: 600, color: "#c0d8e8" }}>{c.partner_name || c.promotor_name || "—"}</td>
-                          <td style={{ padding: "13px 20px", fontSize: 13, color: "#5a8aaa" }}>{c.business_name || "—"}</td>
-                          <td style={{ padding: "13px 20px", fontSize: 13, fontWeight: 700, color: "#ffffff" }}>
-                            ${Number(c.amount || 0).toLocaleString()}
-                          </td>
-                          <td style={{ padding: "13px 20px" }}>
-                            <span style={{
-                              fontSize: 11, fontWeight: 700,
-                              color: isPaid ? "#35c060" : "#e8c547",
-                              background: isPaid ? "rgba(53,192,96,0.1)" : "rgba(232,197,71,0.1)",
-                              border: `1px solid ${isPaid ? "rgba(53,192,96,0.25)" : "rgba(232,197,71,0.25)"}`,
-                              padding: "3px 9px", borderRadius: 20,
-                            }}>
-                              {isPaid ? "Paid" : "Pending"}
-                            </span>
-                          </td>
-                          <td style={{ padding: "13px 20px", fontSize: 12, color: "#4a7090" }}>
-                            {c.created_at ? new Date(c.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "—"}
-                          </td>
-                        </tr>
-                      );
-                    })}
+                    {earningRows.map((row) => (
+                      <tr
+                        key={row.currency}
+                        style={{
+                          borderBottom: "1px solid rgba(50,80,140,0.14)",
+                        }}
+                      >
+                        <td
+                          style={{
+                            padding: "10px 12px",
+                            fontSize: 13,
+                            color: "#7ab0cc",
+                          }}
+                        >
+                          {row.currency}
+                        </td>
+                        <td
+                          style={{
+                            padding: "10px 12px",
+                            fontSize: 13,
+                            color: "#a0c8e8",
+                          }}
+                        >
+                          {row.currency} {row.owed.toFixed(2)}
+                        </td>
+                        <td
+                          style={{
+                            padding: "10px 12px",
+                            fontSize: 13,
+                            color: "#a0c8e8",
+                          }}
+                        >
+                          {row.currency} {row.paid.toFixed(2)}
+                        </td>
+                        <td
+                          style={{
+                            padding: "10px 12px",
+                            fontSize: 14,
+                            fontWeight: 700,
+                            color: row.balance > 0 ? "#e8c547" : "#7ac77a",
+                          }}
+                        >
+                          {row.currency} {row.balance.toFixed(2)}
+                        </td>
+                      </tr>
+                    ))}
                   </tbody>
                 </table>
+              )}
+            </Card>
+
+            <Card style={{ marginBottom: 16 }}>
+              <SectionLabel>DEMO LINKS</SectionLabel>
+              <p
+                style={{
+                  fontSize: 13,
+                  color: "#4a7090",
+                  marginTop: -8,
+                  marginBottom: 14,
+                }}
+              >
+                Open or share these with prospects.
+              </p>
+
+              {demoLinks.length === 0 ? (
+                <p style={{ fontSize: 14, color: "#3a5a70", margin: 0 }}>
+                  No demos available yet.
+                </p>
+              ) : (
+                demoLinks.map((demo) => (
+                  <div
+                    key={demo.id}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      padding: "10px 0",
+                      borderBottom: "1px solid rgba(50,80,140,0.18)",
+                      gap: 12,
+                    }}
+                  >
+                    <div>
+                      <div
+                        style={{
+                          fontSize: 14,
+                          fontWeight: 700,
+                          color: "#c0d8e8",
+                        }}
+                      >
+                        {demo.name}
+                      </div>
+                      {demo.description && (
+                        <div
+                          style={{
+                            fontSize: 12,
+                            color: "#4a7090",
+                            marginTop: 2,
+                          }}
+                        >
+                          {demo.description}
+                        </div>
+                      )}
+                    </div>
+                    <a
+                      href={demo.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      style={{
+                        fontSize: 13,
+                        color: "#5ab0f0",
+                        textDecoration: "none",
+                        fontWeight: 600,
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      Open ↗
+                    </a>
+                  </div>
+                ))
+              )}
+            </Card>
+
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
+                gap: 16,
+              }}
+            >
+              <Card>
+                <SectionLabel>ONBOARDING CHECKLIST</SectionLabel>
+
+                {checklist.map((item) => (
+                  <div
+                    key={item.item_key}
+                    onClick={() => toggleCheck(item)}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 12,
+                      padding: "11px 0",
+                      borderBottom: "1px solid rgba(50,80,140,0.18)",
+                      cursor: "pointer",
+                      userSelect: "none",
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: 20,
+                        height: 20,
+                        borderRadius: 5,
+                        border: "1.5px solid",
+                        borderColor: item.completed
+                          ? "#5ab0f0"
+                          : "rgba(80,130,180,0.28)",
+                        background: item.completed ? "#5ab0f0" : "transparent",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        flexShrink: 0,
+                      }}
+                    >
+                      {item.completed && (
+                        <svg width="11" height="9" viewBox="0 0 11 9" fill="none">
+                          <path
+                            d="M1 4L4 7L10 1"
+                            stroke="white"
+                            strokeWidth="1.8"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                        </svg>
+                      )}
+                    </div>
+
+                    <div style={{ flex: 1 }}>
+                      <div
+                        style={{
+                          fontSize: 14,
+                          color: item.completed ? "#3a5a70" : "#b0cce0",
+                          textDecoration: item.completed ? "line-through" : "none",
+                          lineHeight: 1.4,
+                        }}
+                      >
+                        {item.label}
+                      </div>
+                      <button
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          setTab(item.section);
+                        }}
+                        style={{
+                          marginTop: 4,
+                          background: "none",
+                          border: "none",
+                          color: "#5ab0f0",
+                          fontSize: 12,
+                          cursor: "pointer",
+                          padding: 0,
+                        }}
+                      >
+                        Go to section
+                      </button>
+                    </div>
+                  </div>
+                ))}
               </Card>
+
+              <Card>
+                <SectionLabel>YOUR PROGRESS</SectionLabel>
+                <div style={{ textAlign: "center", padding: "20px 0 12px" }}>
+                  <div
+                    style={{
+                      fontSize: 54,
+                      fontWeight: 800,
+                      color: "#5ab0f0",
+                      lineHeight: 1,
+                    }}
+                  >
+                    {pct}%
+                  </div>
+                  <div style={{ fontSize: 13, color: "#3a5a70", marginTop: 6 }}>
+                    {doneCount} of {totalCount} tasks complete
+                  </div>
+                  <div
+                    style={{
+                      marginTop: 18,
+                      height: 7,
+                      background: "rgba(80,130,180,0.12)",
+                      borderRadius: 4,
+                      overflow: "hidden",
+                    }}
+                  >
+                    <div
+                      style={{
+                        height: "100%",
+                        width: `${pct}%`,
+                        background: "linear-gradient(90deg, #3a9ad9, #2a7ab8)",
+                        borderRadius: 4,
+                      }}
+                    />
+                  </div>
+                </div>
+              </Card>
+            </div>
+          </div>
+        )}
+
+        {tab === "profile" && (
+          <Card style={{ maxWidth: 540 }}>
+            <SectionLabel>PARTNER INFORMATION</SectionLabel>
+            <FieldRow label="Full Name" value={profile?.full_name} />
+            <FieldRow label="Email" value={profile?.email} />
+            <FieldRow label="Region" value={profile?.region} />
+            <FieldRow label="Phone" value={profile?.phone} />
+            <FieldRow label="Role" value={profile?.role} />
+            <div
+              style={{
+                marginTop: 18,
+                fontSize: 12,
+                color: "#2a4050",
+                lineHeight: 1.5,
+              }}
+            >
+              To update your profile, contact your QR-Wegn administrator.
+            </div>
+          </Card>
+        )}
+
+        {tab === "training" && (
+          <div>
+            <Card style={{ marginBottom: 16 }}>
+              <SectionLabel>TRAINING</SectionLabel>
+              <h2
+                style={{
+                  color: "#ffffff",
+                  fontSize: 20,
+                  margin: "0 0 8px",
+                }}
+              >
+                Partner Enablement
+              </h2>
+              <p
+                style={{
+                  color: "#5a8aaa",
+                  fontSize: 14,
+                  lineHeight: 1.7,
+                  margin: 0,
+                }}
+              >
+                Use this section to understand the products, explain the value,
+                show demos, and understand how commissions are earned.
+              </p>
+            </Card>
+
+            <div style={{ display: "grid", gap: 14 }}>
+              {training.map((item) => (
+                <Card key={item.id}>
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      gap: 16,
+                      alignItems: "flex-start",
+                    }}
+                  >
+                    <div>
+                      <div
+                        style={{
+                          fontSize: 16,
+                          fontWeight: 800,
+                          color: "#c0d8e8",
+                          marginBottom: 6,
+                        }}
+                      >
+                        {item.title}
+                      </div>
+                      <div
+                        style={{
+                          fontSize: 13,
+                          color: "#5a8aaa",
+                          lineHeight: 1.7,
+                        }}
+                      >
+                        {item.description}
+                      </div>
+                    </div>
+
+                    <span
+                      style={{
+                        fontSize: 10,
+                        fontWeight: 800,
+                        color: "#5ab0f0",
+                        background: "rgba(80,160,230,0.1)",
+                        border: "1px solid rgba(80,160,230,0.22)",
+                        borderRadius: 20,
+                        padding: "4px 10px",
+                        textTransform: "uppercase",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {item.type || "guide"}
+                    </span>
+                  </div>
+
+                  {item.file_url && (
+                    <a
+                      href={item.file_url}
+                      target="_blank"
+                      rel="noreferrer"
+                      style={{
+                        display: "inline-block",
+                        marginTop: 14,
+                        color: "#5ab0f0",
+                        fontSize: 13,
+                        fontWeight: 700,
+                        textDecoration: "none",
+                      }}
+                    >
+                      Open training ↗
+                    </a>
+                  )}
+                </Card>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {tab === "materials" && (
+          <div>
+            <Card style={{ marginBottom: 16 }}>
+              <SectionLabel>SALES MATERIALS</SectionLabel>
+              <h2
+                style={{
+                  color: "#ffffff",
+                  fontSize: 20,
+                  margin: "0 0 8px",
+                }}
+              >
+                Assets for Outreach
+              </h2>
+              <p
+                style={{
+                  color: "#5a8aaa",
+                  fontSize: 14,
+                  lineHeight: 1.7,
+                  margin: 0,
+                }}
+              >
+                Use these cards for pitch sheets, scripts, social posts, and
+                customer-facing materials.
+              </p>
+            </Card>
+
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))",
+                gap: 14,
+              }}
+            >
+              {materials.map((item) => (
+                <Card key={item.id} style={{ display: "flex", flexDirection: "column" }}>
+                  <div style={{ fontSize: 26, marginBottom: 10 }}>
+                    {item.type === "script"
+                      ? "💬"
+                      : item.type === "social"
+                      ? "📣"
+                      : item.type === "pitch"
+                      ? "📄"
+                      : "📁"}
+                  </div>
+
+                  <div
+                    style={{
+                      fontSize: 14,
+                      fontWeight: 800,
+                      color: "#b0cce0",
+                      lineHeight: 1.3,
+                      marginBottom: 8,
+                    }}
+                  >
+                    {item.title}
+                  </div>
+
+                  <div
+                    style={{
+                      fontSize: 12,
+                      color: "#5a8aaa",
+                      lineHeight: 1.6,
+                      marginBottom: 12,
+                    }}
+                  >
+                    {item.description}
+                  </div>
+
+                  <span
+                    style={{
+                      display: "inline-block",
+                      width: "fit-content",
+                      fontSize: 10,
+                      fontWeight: 800,
+                      letterSpacing: "0.08em",
+                      color: "#5ab0f0",
+                      background: "rgba(80,160,230,0.1)",
+                      padding: "3px 9px",
+                      borderRadius: 20,
+                      textTransform: "uppercase",
+                      marginBottom: 14,
+                    }}
+                  >
+                    {item.type || "material"}
+                  </span>
+
+                  {item.file_url ? (
+                    <a
+                      href={item.file_url}
+                      target="_blank"
+                      rel="noreferrer"
+                      style={{
+                        display: "block",
+                        marginTop: "auto",
+                        textAlign: "center",
+                        padding: "8px 0",
+                        borderRadius: 8,
+                        background: "rgba(80,160,230,0.12)",
+                        border: "1px solid rgba(80,160,230,0.25)",
+                        color: "#5ab0f0",
+                        fontSize: 13,
+                        fontWeight: 700,
+                        textDecoration: "none",
+                      }}
+                    >
+                      Open
+                    </a>
+                  ) : (
+                    <div
+                      style={{
+                        marginTop: "auto",
+                        fontSize: 12,
+                        color: "#3a5a70",
+                      }}
+                    >
+                      Admin can attach a file later.
+                    </div>
+                  )}
+                </Card>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {tab === "my-promotors" && (
+          <div>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "flex-end",
+                marginBottom: 14,
+              }}
+            >
+              <button
+                onClick={() => {
+                  setShowRecruitForm((value) => !value);
+                  setRecruitError("");
+                }}
+                style={{
+                  padding: "8px 18px",
+                  borderRadius: 8,
+                  border: "none",
+                  cursor: "pointer",
+                  background: "rgba(80,160,230,0.18)",
+                  color: "#5ab0f0",
+                  fontSize: 13,
+                  fontWeight: 700,
+                }}
+              >
+                {showRecruitForm ? "Cancel" : "+ Recruit Promotor"}
+              </button>
+            </div>
+
+            {recruitSuccess && (
+              <div
+                style={{
+                  background: "rgba(40,180,80,0.08)",
+                  border: "1px solid rgba(40,180,80,0.22)",
+                  borderRadius: 10,
+                  padding: "12px 16px",
+                  marginBottom: 16,
+                  fontSize: 13,
+                  color: "#35c060",
+                }}
+              >
+                Promotor added successfully.
+              </div>
+            )}
+
+            {showRecruitForm && (
+              <Card style={{ marginBottom: 20 }}>
+                <SectionLabel>NEW PROMOTOR</SectionLabel>
+
+                {recruitError && (
+                  <div
+                    style={{
+                      background: "rgba(220,60,60,0.08)",
+                      border: "1px solid rgba(220,60,60,0.3)",
+                      borderRadius: 10,
+                      padding: "10px 14px",
+                      marginBottom: 14,
+                      fontSize: 13,
+                      color: "#f07070",
+                    }}
+                  >
+                    {recruitError}
+                  </div>
+                )}
+
+                <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                  {[
+                    ["full_name", "Full Name"],
+                    ["email", "Email"],
+                    ["phone", "Phone"],
+                    ["country", "Country"],
+                  ].map(([key, label]) => (
+                    <div key={key}>
+                      <label
+                        style={{
+                          fontSize: 11,
+                          fontWeight: 700,
+                          color: "#4a7090",
+                          letterSpacing: "0.08em",
+                          display: "block",
+                          marginBottom: 4,
+                        }}
+                      >
+                        {label.toUpperCase()}
+                      </label>
+                      <input
+                        value={recruitForm[key]}
+                        onChange={(event) =>
+                          setRecruitForm((form) => ({
+                            ...form,
+                            [key]: event.target.value,
+                          }))
+                        }
+                        style={inputStyle}
+                      />
+                    </div>
+                  ))}
+
+                  <button
+                    onClick={recruitPromotor}
+                    disabled={recruitSaving || !recruitForm.full_name.trim()}
+                    style={{
+                      padding: "11px 0",
+                      borderRadius: 9,
+                      border: "none",
+                      background:
+                        recruitSaving || !recruitForm.full_name.trim()
+                          ? "rgba(80,140,210,0.18)"
+                          : "linear-gradient(135deg, #3a9ad9, #2a7ab8)",
+                      color:
+                        recruitSaving || !recruitForm.full_name.trim()
+                          ? "#3a5a70"
+                          : "white",
+                      fontSize: 14,
+                      fontWeight: 700,
+                      cursor:
+                        recruitSaving || !recruitForm.full_name.trim()
+                          ? "default"
+                          : "pointer",
+                    }}
+                  >
+                    {recruitSaving ? "Adding..." : "Add Promotor"}
+                  </button>
+                </div>
+              </Card>
+            )}
+
+            {promotors.length === 0 ? (
+              <Card style={{ textAlign: "center", padding: "52px 24px" }}>
+                <div style={{ fontSize: 36, marginBottom: 14 }}>👥</div>
+                <div
+                  style={{
+                    fontSize: 16,
+                    fontWeight: 600,
+                    color: "#b0cce0",
+                    marginBottom: 8,
+                  }}
+                >
+                  No promotors yet
+                </div>
+                <div style={{ fontSize: 13, color: "#4a7090" }}>
+                  Use the Recruit Promotor button to add your first one.
+                </div>
+              </Card>
+            ) : (
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))",
+                  gap: 14,
+                }}
+              >
+                {promotors.map((promotor) => (
+                  <Card key={promotor.id}>
+                    <div
+                      style={{
+                        fontSize: 15,
+                        fontWeight: 800,
+                        color: "#c0d8e8",
+                        marginBottom: 4,
+                      }}
+                    >
+                      {promotor.full_name || "Unnamed Promotor"}
+                    </div>
+                    <div style={{ fontSize: 13, color: "#4a7090" }}>
+                      {promotor.country || "No country listed"}
+                    </div>
+                    <div
+                      style={{
+                        marginTop: 12,
+                        fontSize: 12,
+                        color: "#5a8aaa",
+                        lineHeight: 1.7,
+                      }}
+                    >
+                      {promotor.email || "No email"}
+                      <br />
+                      {promotor.phone || "No phone"}
+                    </div>
+                  </Card>
+                ))}
+              </div>
             )}
           </div>
         )}
 
-        {/* LEADS */}
+        {tab === "commissions" && (
+          <Card style={{ textAlign: "center", padding: "52px 24px" }}>
+            <div style={{ fontSize: 36, marginBottom: 14 }}>💰</div>
+            <div
+              style={{
+                fontSize: 15,
+                fontWeight: 600,
+                color: "#b0cce0",
+                marginBottom: 8,
+              }}
+            >
+              Commission details are calculated on the Home page.
+            </div>
+            <div style={{ fontSize: 13, color: "#4a7090" }}>
+              Earnings are based on signed/active leads minus payouts.
+            </div>
+          </Card>
+        )}
+
         {tab === "leads" && (
           <Card style={{ maxWidth: 540 }}>
             <SectionLabel>SUBMIT A LEAD</SectionLabel>
-            <p style={{ fontSize: 13, color: "#4a7090", marginTop: -4, marginBottom: 20, lineHeight: 1.6 }}>
-              Know a restaurant or business that could benefit from QR-Wegn? Submit their details and we&apos;ll follow up.
+
+            <p
+              style={{
+                fontSize: 13,
+                color: "#4a7090",
+                marginTop: -4,
+                marginBottom: 20,
+                lineHeight: 1.6,
+              }}
+            >
+              Submit a restaurant, café, salon, barbershop, or other prospect.
             </p>
 
             {leadSuccess && (
-              <div style={{ background: "rgba(40,180,80,0.08)", border: "1px solid rgba(40,180,80,0.22)", borderRadius: 10, padding: "12px 16px", marginBottom: 18, fontSize: 13, color: "#35c060", display: "flex", alignItems: "center", gap: 8 }}>
-                <svg width="14" height="12" viewBox="0 0 14 12" fill="none">
-                  <path d="M1 6L5 10L13 1" stroke="#35c060" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-                Lead submitted successfully!
+              <div
+                style={{
+                  background: "rgba(40,180,80,0.08)",
+                  border: "1px solid rgba(40,180,80,0.22)",
+                  borderRadius: 10,
+                  padding: "12px 16px",
+                  marginBottom: 18,
+                  fontSize: 13,
+                  color: "#35c060",
+                }}
+              >
+                Lead submitted successfully.
               </div>
             )}
 
             {leadError && (
-              <div style={{ background: "rgba(220,60,60,0.08)", border: "1px solid rgba(220,60,60,0.3)", borderRadius: 10, padding: "12px 16px", marginBottom: 18, fontSize: 13, color: "#f07070" }}>
+              <div
+                style={{
+                  background: "rgba(220,60,60,0.08)",
+                  border: "1px solid rgba(220,60,60,0.3)",
+                  borderRadius: 10,
+                  padding: "12px 16px",
+                  marginBottom: 18,
+                  fontSize: 13,
+                  color: "#f07070",
+                }}
+              >
                 {leadError}
               </div>
             )}
 
             <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
               {[
-                { key: "business_name", label: "Business Name", required: true, placeholder: "e.g. Juba Kitchen" },
-                { key: "owner_name", label: "Owner / Contact Name", required: false, placeholder: "e.g. James Wani" },
-                { key: "phone", label: "Phone Number", required: false, placeholder: "+211 ..." },
-                { key: "country", label: "Country", required: false, placeholder: "e.g. South Sudan" },
-              ].map(({ key, label, required, placeholder }) => (
+                ["business_name", "Business Name"],
+                ["owner_name", "Owner / Contact Name"],
+                ["phone", "Phone Number"],
+                ["country", "Country"],
+              ].map(([key, label]) => (
                 <div key={key}>
-                  <label style={{ fontSize: 11, fontWeight: 700, color: "#4a7090", letterSpacing: "0.08em", display: "block", marginBottom: 5 }}>
-                    {label.toUpperCase()}{required && <span style={{ color: "#e8c547", marginLeft: 3 }}>*</span>}
+                  <label
+                    style={{
+                      fontSize: 11,
+                      fontWeight: 700,
+                      color: "#4a7090",
+                      letterSpacing: "0.08em",
+                      display: "block",
+                      marginBottom: 5,
+                    }}
+                  >
+                    {label.toUpperCase()}
                   </label>
                   <input
                     value={lead[key]}
-                    onChange={e => setLead(l => ({ ...l, [key]: e.target.value }))}
-                    placeholder={placeholder}
+                    onChange={(event) =>
+                      setLead((current) => ({
+                        ...current,
+                        [key]: event.target.value,
+                      }))
+                    }
                     style={inputStyle}
                   />
                 </div>
               ))}
 
               <div>
-                <label style={{ fontSize: 11, fontWeight: 700, color: "#4a7090", letterSpacing: "0.08em", display: "block", marginBottom: 5 }}>NOTES</label>
+                <label
+                  style={{
+                    fontSize: 11,
+                    fontWeight: 700,
+                    color: "#4a7090",
+                    letterSpacing: "0.08em",
+                    display: "block",
+                    marginBottom: 5,
+                  }}
+                >
+                  NOTES
+                </label>
                 <textarea
                   value={lead.notes}
-                  onChange={e => setLead(l => ({ ...l, notes: e.target.value }))}
-                  placeholder="Any additional context about this business..."
+                  onChange={(event) =>
+                    setLead((current) => ({
+                      ...current,
+                      notes: event.target.value,
+                    }))
+                  }
                   rows={3}
                   style={{ ...inputStyle, resize: "vertical" }}
                 />
@@ -765,18 +1580,23 @@ export default function PartnerPortal({ profile, onLogout }) {
                   padding: "12px 0",
                   borderRadius: 10,
                   border: "none",
-                  background: leadSaving || !lead.business_name.trim()
-                    ? "rgba(80,140,210,0.18)"
-                    : "linear-gradient(135deg, #3a9ad9, #2a7ab8)",
-                  color: leadSaving || !lead.business_name.trim() ? "#3a5a70" : "white",
+                  background:
+                    leadSaving || !lead.business_name.trim()
+                      ? "rgba(80,140,210,0.18)"
+                      : "linear-gradient(135deg, #3a9ad9, #2a7ab8)",
+                  color:
+                    leadSaving || !lead.business_name.trim()
+                      ? "#3a5a70"
+                      : "white",
                   fontSize: 14,
                   fontWeight: 700,
-                  cursor: leadSaving || !lead.business_name.trim() ? "default" : "pointer",
-                  boxShadow: leadSaving || !lead.business_name.trim() ? "none" : "0 4px 16px rgba(42,122,184,0.28)",
-                  transition: "all 0.15s",
+                  cursor:
+                    leadSaving || !lead.business_name.trim()
+                      ? "default"
+                      : "pointer",
                 }}
               >
-                {leadSaving ? "Submitting…" : "Submit Lead"}
+                {leadSaving ? "Submitting..." : "Submit Lead"}
               </button>
             </div>
           </Card>

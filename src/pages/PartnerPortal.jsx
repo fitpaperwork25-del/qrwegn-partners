@@ -215,6 +215,8 @@ export default function PartnerPortal({ profile, onLogout }) {
     email: "",
     phone: "",
     country: "",
+    languages: "",
+    notes: "",
     type: "individual",
   });
   const [recruitSaving, setRecruitSaving] = useState(false);
@@ -388,6 +390,8 @@ export default function PartnerPortal({ profile, onLogout }) {
       email: recruitForm.email.trim() || null,
       phone: recruitForm.phone.trim() || null,
       country: recruitForm.country.trim() || null,
+      languages: recruitForm.languages.trim() || null,
+      notes: recruitForm.notes.trim() || null,
       type: recruitForm.type || "individual",
       status: "active",
     });
@@ -404,6 +408,8 @@ export default function PartnerPortal({ profile, onLogout }) {
       email: "",
       phone: "",
       country: "",
+      languages: "",
+      notes: "",
       type: "individual",
     });
     setShowRecruitForm(false);
@@ -1425,10 +1431,7 @@ export default function PartnerPortal({ profile, onLogout }) {
               }}
             >
               <button
-                onClick={() => {
-                  setShowRecruitForm((value) => !value);
-                  setRecruitError("");
-                }}
+                onClick={() => { setShowRecruitForm(true); setRecruitError(""); }}
                 style={{
                   padding: "8px 18px",
                   borderRadius: 8,
@@ -1440,7 +1443,7 @@ export default function PartnerPortal({ profile, onLogout }) {
                   fontWeight: 700,
                 }}
               >
-                {showRecruitForm ? "Cancel" : "+ Recruit Promotor"}
+                + Recruit Promotor
               </button>
             </div>
 
@@ -1460,87 +1463,6 @@ export default function PartnerPortal({ profile, onLogout }) {
               </div>
             )}
 
-            {showRecruitForm && (
-              <Card style={{ marginBottom: 20 }}>
-                <SectionLabel>NEW PROMOTOR</SectionLabel>
-
-                {recruitError && (
-                  <div
-                    style={{
-                      background: "rgba(220,60,60,0.08)",
-                      border: "1px solid rgba(220,60,60,0.3)",
-                      borderRadius: 10,
-                      padding: "10px 14px",
-                      marginBottom: 14,
-                      fontSize: 13,
-                      color: "#f07070",
-                    }}
-                  >
-                    {recruitError}
-                  </div>
-                )}
-
-                <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                  {[
-                    ["full_name", "Full Name"],
-                    ["email", "Email"],
-                    ["phone", "Phone"],
-                    ["country", "Country"],
-                  ].map(([key, label]) => (
-                    <div key={key}>
-                      <label
-                        style={{
-                          fontSize: 11,
-                          fontWeight: 700,
-                          color: "#4a7090",
-                          letterSpacing: "0.08em",
-                          display: "block",
-                          marginBottom: 4,
-                        }}
-                      >
-                        {label.toUpperCase()}
-                      </label>
-                      <input
-                        value={recruitForm[key]}
-                        onChange={(event) =>
-                          setRecruitForm((form) => ({
-                            ...form,
-                            [key]: event.target.value,
-                          }))
-                        }
-                        style={inputStyle}
-                      />
-                    </div>
-                  ))}
-
-                  <button
-                    onClick={recruitPromotor}
-                    disabled={recruitSaving || !recruitForm.full_name.trim()}
-                    style={{
-                      padding: "11px 0",
-                      borderRadius: 9,
-                      border: "none",
-                      background:
-                        recruitSaving || !recruitForm.full_name.trim()
-                          ? "rgba(80,140,210,0.18)"
-                          : "linear-gradient(135deg, #3a9ad9, #2a7ab8)",
-                      color:
-                        recruitSaving || !recruitForm.full_name.trim()
-                          ? "#3a5a70"
-                          : "white",
-                      fontSize: 14,
-                      fontWeight: 700,
-                      cursor:
-                        recruitSaving || !recruitForm.full_name.trim()
-                          ? "default"
-                          : "pointer",
-                    }}
-                  >
-                    {recruitSaving ? "Adding..." : "Add Promotor"}
-                  </button>
-                </div>
-              </Card>
-            )}
 
             {promotors.length === 0 ? (
               <Card style={{ textAlign: "center", padding: "52px 24px" }}>
@@ -1869,6 +1791,86 @@ export default function PartnerPortal({ profile, onLogout }) {
           </Card>
         )}
       </div>
+
+      {/* Recruit Promotor modal */}
+      {showRecruitForm && (
+        <div
+          onClick={(e) => { if (e.target === e.currentTarget) { setShowRecruitForm(false); setRecruitError(""); } }}
+          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.65)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 200, padding: 24 }}
+        >
+          <div style={{ background: "#0b1739", border: "1px solid rgba(50,80,140,0.4)", borderRadius: 18, padding: "32px 28px", width: "100%", maxWidth: 480, boxShadow: "0 8px 40px rgba(0,0,0,0.5)" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 22 }}>
+              <h2 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: "#ffffff" }}>Recruit Promotor</h2>
+              <button
+                onClick={() => { setShowRecruitForm(false); setRecruitError(""); }}
+                style={{ background: "none", border: "none", color: "#4a7090", fontSize: 20, cursor: "pointer", lineHeight: 1, padding: "0 4px" }}
+              >✕</button>
+            </div>
+
+            {recruitError && (
+              <div style={{ background: "rgba(220,60,60,0.08)", border: "1px solid rgba(220,60,60,0.3)", borderRadius: 10, padding: "10px 14px", marginBottom: 16, fontSize: 13, color: "#f07070" }}>
+                {recruitError}
+              </div>
+            )}
+
+            <div style={{ display: "flex", flexDirection: "column", gap: 13 }}>
+              {[
+                { key: "full_name",  label: "Full Name",  required: true,  type: "text"  },
+                { key: "email",      label: "Email",      required: false, type: "email" },
+                { key: "phone",      label: "Phone",      required: false, type: "text"  },
+                { key: "country",    label: "Country",    required: false, type: "text"  },
+                { key: "languages",  label: "Languages",  required: false, type: "text"  },
+              ].map(({ key, label, required, type }) => (
+                <div key={key}>
+                  <label style={{ fontSize: 11, fontWeight: 700, color: "#4a7090", letterSpacing: "0.08em", display: "block", marginBottom: 5 }}>
+                    {label.toUpperCase()}{required && <span style={{ color: "#5ab0f0", marginLeft: 3 }}>*</span>}
+                  </label>
+                  <input
+                    type={type}
+                    value={recruitForm[key]}
+                    onChange={(e) => setRecruitForm((f) => ({ ...f, [key]: e.target.value }))}
+                    style={inputStyle}
+                  />
+                </div>
+              ))}
+
+              <div>
+                <label style={{ fontSize: 11, fontWeight: 700, color: "#4a7090", letterSpacing: "0.08em", display: "block", marginBottom: 5 }}>NOTES</label>
+                <textarea
+                  rows={3}
+                  value={recruitForm.notes}
+                  onChange={(e) => setRecruitForm((f) => ({ ...f, notes: e.target.value }))}
+                  style={{ ...inputStyle, resize: "vertical" }}
+                />
+              </div>
+
+              <div style={{ display: "flex", gap: 10, marginTop: 4 }}>
+                <button
+                  onClick={recruitPromotor}
+                  disabled={recruitSaving || !recruitForm.full_name.trim()}
+                  style={{
+                    flex: 1, padding: "12px 0", borderRadius: 10, border: "none",
+                    background: recruitSaving || !recruitForm.full_name.trim()
+                      ? "rgba(80,140,210,0.18)"
+                      : "linear-gradient(135deg, #3a9ad9, #2a7ab8)",
+                    color: recruitSaving || !recruitForm.full_name.trim() ? "#3a5a70" : "white",
+                    fontSize: 14, fontWeight: 700,
+                    cursor: recruitSaving || !recruitForm.full_name.trim() ? "default" : "pointer",
+                  }}
+                >
+                  {recruitSaving ? "Adding..." : "Add Promotor"}
+                </button>
+                <button
+                  onClick={() => { setShowRecruitForm(false); setRecruitError(""); }}
+                  style={{ padding: "12px 20px", borderRadius: 10, border: "1px solid rgba(50,80,140,0.3)", background: "none", color: "#4a7090", fontSize: 14, fontWeight: 700, cursor: "pointer" }}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

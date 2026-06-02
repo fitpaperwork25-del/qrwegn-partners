@@ -46,36 +46,20 @@ export default function JoinPage({ partnerId }) {
     setError("");
 
     const { error: dbError } = await supabase.from("promotors").insert({
-      full_name:  form.full_name.trim(),
-      email:      form.email.trim(),
-      phone:      form.phone.trim()   || null,
-      country:    form.country.trim() || null,
-      notes:      form.notes.trim()   || null,
-      partner_id: partnerId,
-      status:     "new",
-      type:       "promotor",
-      source:     "Referral link",
+      partner_id:   partnerId,
+      full_name:    form.full_name.trim(),
+      email:        form.email.trim(),
+      phone:        form.phone.trim()   || null,
+      country:      form.country.trim() || null,
+      type:         "promotor",
+      status:       "Interested",
+      recruited_at: new Date().toISOString(),
     });
 
     setSubmitting(false);
     if (dbError) {
-      // Gracefully handle missing 'source' column — retry without it
-      if (dbError.message && dbError.message.toLowerCase().includes("source")) {
-        const { error: retryError } = await supabase.from("promotors").insert({
-          full_name:  form.full_name.trim(),
-          email:      form.email.trim(),
-          phone:      form.phone.trim()   || null,
-          country:    form.country.trim() || null,
-          notes:      `[Referral link]${form.notes.trim() ? " " + form.notes.trim() : ""}`,
-          partner_id: partnerId,
-          status:     "new",
-          type:       "promotor",
-        });
-        if (retryError) { setError("Submission failed: " + retryError.message); return; }
-      } else {
-        setError("Submission failed: " + dbError.message);
-        return;
-      }
+      setError("Submission failed: " + dbError.message);
+      return;
     }
 
     setSubmitted(true);

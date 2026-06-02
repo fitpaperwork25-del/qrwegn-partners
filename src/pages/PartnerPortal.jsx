@@ -297,9 +297,9 @@ export default function PartnerPortal({ profile, onLogout }) {
 
   const loadTraining = async () => {
     const { data, error } = await supabase
-      .from("training_content")
+      .from("training_materials")
       .select("*")
-      .order("sort_order", { ascending: true });
+      .order("created_at", { ascending: false });
 
     if (!error && data?.length) {
       setTraining(data);

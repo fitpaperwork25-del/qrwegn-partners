@@ -437,7 +437,11 @@ export default function AdminDashboard({ navigate }) {
                           : "—"}
                       </div>
                     </td>
-                    <td style={{ padding: "12px 14px", fontSize: 13, color: "#5ab0f0", whiteSpace: "nowrap" }}>{l.submitted_by_partner?.full_name || "—"}</td>
+                    <td style={{ padding: "12px 14px", fontSize: 13, color: "#5ab0f0", whiteSpace: "nowrap" }}>
+                      {l.submitted_by_partner?.full_name
+                        || promotors.find(p => p.id === l.submitted_by_promotor_id)?.full_name
+                        || "—"}
+                    </td>
                     <td style={{ padding: "12px 14px", fontSize: 13, color: "#7ab0cc", whiteSpace: "nowrap" }}>{fmtDate(l.created_at)}</td>
                   </tr>
                 ))}

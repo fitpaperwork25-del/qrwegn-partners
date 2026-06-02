@@ -2,9 +2,80 @@ import { useState, useEffect } from "react";
 import { supabase } from "../lib/supabase";
 
 const TABS = [
-  { id: "home",      label: "Home" },
-  { id: "leads",     label: "Submit Lead" },
-  { id: "my-leads",  label: "My Leads" },
+  { id: "home",      label: "Home"         },
+  { id: "leads",     label: "Submit Lead"  },
+  { id: "my-leads",  label: "My Leads"     },
+  { id: "training",  label: "Training"     },
+  { id: "materials", label: "Materials"    },
+];
+
+const DEFAULT_TRAINING = [
+  {
+    id: "platform-overview",
+    title: "Platform Overview",
+    type: "guide",
+    description:
+      "QRWegn helps restaurants and cafés accept QR orders. QRBooker helps salons and barbershops manage bookings.",
+  },
+  {
+    id: "qrwegn-pitch",
+    title: "How to Pitch QRWegn",
+    type: "sales",
+    description:
+      "Lead with the problem: slow ordering, staff pressure, missed orders, and poor customer flow. Then show scan → order → kitchen.",
+  },
+  {
+    id: "qrbooker-pitch",
+    title: "How to Pitch QRBooker",
+    type: "sales",
+    description:
+      "Focus on appointment control, barber/chair schedules, fewer missed calls, and cleaner customer booking.",
+  },
+  {
+    id: "commission-structure",
+    title: "Commission Structure",
+    type: "money",
+    description:
+      "Commissions are based on the business plan, monthly value, partner percentage, promotor percentage, and payout records.",
+  },
+  {
+    id: "demo-links-guide",
+    title: "Where Demo Links Live",
+    type: "demo",
+    description:
+      "Demo links are shown on the Home page. Use them to show prospects live examples before they commit.",
+  },
+];
+
+const DEFAULT_MATERIALS = [
+  {
+    id: "restaurant-one-pager",
+    title: "Restaurant Pitch One-Pager",
+    type: "pitch",
+    description:
+      "Simple talking points for restaurants, cafés, hotels, and food courts.",
+  },
+  {
+    id: "barber-one-pager",
+    title: "Barbershop Pitch One-Pager",
+    type: "pitch",
+    description:
+      "Simple talking points for barbershops, salons, beauty shops, and appointment-based businesses.",
+  },
+  {
+    id: "whatsapp-script",
+    title: "WhatsApp Outreach Script",
+    type: "script",
+    description:
+      "Short message a partner or promotor can send to a business owner.",
+  },
+  {
+    id: "facebook-copy",
+    title: "Facebook / Social Copy",
+    type: "social",
+    description:
+      "Ready-to-edit post copy for promoting QRWegn and QRBooker online.",
+  },
 ];
 
 const emptyLead = { business_name: "", owner_name: "", phone: "", country: "", notes: "" };
@@ -55,6 +126,8 @@ export default function PromotorPortal({ profile, onLogout }) {
   const [leadsLoaded,  setLeadsLoaded] = useState(false);
   const [myPayouts,    setMyPayouts]   = useState([]);
   const [demoLinks,    setDemoLinks]   = useState([]);
+  const [training,     setTraining]    = useState(DEFAULT_TRAINING);
+  const [materials,    setMaterials]   = useState(DEFAULT_MATERIALS);
 
   const initials  = profile?.full_name
     ? profile.full_name.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase()
@@ -70,6 +143,12 @@ export default function PromotorPortal({ profile, onLogout }) {
     });
     supabase.from("demo_links").select("*").order("created_at", { ascending: false }).then(({ data, error }) => {
       if (!error) setDemoLinks(data || []);
+    });
+    supabase.from("training_materials").select("*").order("created_at", { ascending: false }).then(({ data, error }) => {
+      if (!error && data?.length) setTraining(data);
+    });
+    supabase.from("sales_materials").select("*").order("created_at", { ascending: false }).then(({ data, error }) => {
+      if (!error && data?.length) setMaterials(data);
     });
   }, []);
 
@@ -371,6 +450,124 @@ export default function PromotorPortal({ profile, onLogout }) {
               </div>
             )}
           </Card>
+        )}
+
+        {/* TRAINING */}
+        {tab === "training" && (
+          <div>
+            <Card style={{ marginBottom: 16 }}>
+              <SectionLabel>TRAINING</SectionLabel>
+              <h2 style={{ color: "#ffffff", fontSize: 20, margin: "0 0 8px" }}>
+                Promotor Enablement
+              </h2>
+              <p style={{ color: "#5a8aaa", fontSize: 14, lineHeight: 1.7, margin: 0 }}>
+                Use this section to understand the products, explain the value, show demos,
+                and understand how commissions are earned.
+              </p>
+            </Card>
+
+            <div style={{ display: "grid", gap: 14 }}>
+              {training.map((item) => (
+                <Card key={item.id}>
+                  <div style={{ display: "flex", justifyContent: "space-between", gap: 16, alignItems: "flex-start" }}>
+                    <div>
+                      <div style={{ fontSize: 16, fontWeight: 800, color: "#c0d8e8", marginBottom: 6 }}>
+                        {item.title}
+                      </div>
+                      <div style={{ fontSize: 13, color: "#5a8aaa", lineHeight: 1.7 }}>
+                        {item.description}
+                      </div>
+                    </div>
+                    <span style={{
+                      fontSize: 10, fontWeight: 800, color: "#5ab0f0",
+                      background: "rgba(80,160,230,0.1)", border: "1px solid rgba(80,160,230,0.22)",
+                      borderRadius: 20, padding: "4px 10px",
+                      textTransform: "uppercase", whiteSpace: "nowrap",
+                    }}>
+                      {item.type || "guide"}
+                    </span>
+                  </div>
+
+                  {item.file_url && (
+                    <a
+                      href={item.file_url}
+                      target="_blank"
+                      rel="noreferrer"
+                      style={{ display: "inline-block", marginTop: 14, color: "#5ab0f0", fontSize: 13, fontWeight: 700, textDecoration: "none" }}
+                    >
+                      Open training ↗
+                    </a>
+                  )}
+                </Card>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* MATERIALS */}
+        {tab === "materials" && (
+          <div>
+            <Card style={{ marginBottom: 16 }}>
+              <SectionLabel>SALES MATERIALS</SectionLabel>
+              <h2 style={{ color: "#ffffff", fontSize: 20, margin: "0 0 8px" }}>
+                Assets for Outreach
+              </h2>
+              <p style={{ color: "#5a8aaa", fontSize: 14, lineHeight: 1.7, margin: 0 }}>
+                Use these cards for pitch sheets, scripts, social posts, and customer-facing materials.
+              </p>
+            </Card>
+
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 14 }}>
+              {materials.map((item) => (
+                <Card key={item.id} style={{ display: "flex", flexDirection: "column" }}>
+                  <div style={{ fontSize: 26, marginBottom: 10 }}>
+                    {item.type === "script" ? "💬"
+                      : item.type === "social" ? "📣"
+                      : item.type === "pitch"  ? "📄"
+                      : "📁"}
+                  </div>
+
+                  <div style={{ fontSize: 14, fontWeight: 800, color: "#b0cce0", lineHeight: 1.3, marginBottom: 8 }}>
+                    {item.title}
+                  </div>
+
+                  <div style={{ fontSize: 12, color: "#5a8aaa", lineHeight: 1.6, marginBottom: 12 }}>
+                    {item.description}
+                  </div>
+
+                  <span style={{
+                    display: "inline-block", width: "fit-content",
+                    fontSize: 10, fontWeight: 800, letterSpacing: "0.08em",
+                    color: "#5ab0f0", background: "rgba(80,160,230,0.1)",
+                    padding: "3px 9px", borderRadius: 20,
+                    textTransform: "uppercase", marginBottom: 14,
+                  }}>
+                    {item.type || "material"}
+                  </span>
+
+                  {item.file_url ? (
+                    <a
+                      href={item.file_url}
+                      target="_blank"
+                      rel="noreferrer"
+                      style={{
+                        display: "block", marginTop: "auto", textAlign: "center",
+                        padding: "8px 0", borderRadius: 8,
+                        background: "rgba(80,160,230,0.12)", border: "1px solid rgba(80,160,230,0.25)",
+                        color: "#5ab0f0", fontSize: 13, fontWeight: 700, textDecoration: "none",
+                      }}
+                    >
+                      Open
+                    </a>
+                  ) : (
+                    <div style={{ marginTop: "auto", fontSize: 12, color: "#3a5a70" }}>
+                      Admin can attach a file later.
+                    </div>
+                  )}
+                </Card>
+              ))}
+            </div>
+          </div>
         )}
 
       </div>

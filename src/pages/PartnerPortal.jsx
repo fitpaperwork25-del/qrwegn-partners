@@ -227,6 +227,8 @@ export default function PartnerPortal({ profile, onLogout }) {
   const [myPayouts, setMyPayouts] = useState([]);
   const [demoLinks, setDemoLinks] = useState([]);
   const [partnerId, setPartnerId] = useState(null);
+  const [commissionTxns, setCommissionTxns] = useState([]);
+  const [commTxnsLoading, setCommTxnsLoading] = useState(false);
 
   useEffect(() => {
     loadAll();
@@ -253,6 +255,7 @@ export default function PartnerPortal({ profile, onLogout }) {
       loadPromotors(pid),
       loadMyLeads(pid),
       loadMyPayouts(pid),
+      loadCommissionTxns(pid),
       loadDemoLinks(),
       loadTraining(),
       loadMaterials(),
@@ -382,6 +385,19 @@ export default function PartnerPortal({ profile, onLogout }) {
       .eq("partner_id", id)
       .order("created_at", { ascending: false });
     if (!error) setPromotors(data || []);
+  };
+
+  const loadCommissionTxns = async (pid) => {
+    const id = pid ?? partnerId;
+    if (!id) { setCommissionTxns([]); return; }
+    setCommTxnsLoading(true);
+    const { data, error } = await supabase
+      .from("commission_transactions")
+      .select("*")
+      .eq("partner_id", id)
+      .order("created_at", { ascending: false });
+    if (!error) setCommissionTxns(data || []);
+    setCommTxnsLoading(false);
   };
 
   const recruitPromotor = async () => {
@@ -1545,24 +1561,97 @@ export default function PartnerPortal({ profile, onLogout }) {
           </div>
         )}
 
-        {tab === "commissions" && (
-          <Card style={{ textAlign: "center", padding: "52px 24px" }}>
-            <div style={{ fontSize: 36, marginBottom: 14 }}>💰</div>
-            <div
-              style={{
-                fontSize: 15,
-                fontWeight: 600,
-                color: "#b0cce0",
-                marginBottom: 8,
-              }}
-            >
-              Commission details are calculated on the Home page.
+        {tab === "commissions" && (() => {
+          const totalOwed = commissionTxns.reduce((s, tx) => s + Number(tx.partner_commission || 0), 0);
+          const totalPaid = myPayouts.reduce((s, p) => s + Number(p.amount || 0), 0);
+          const balanceDue = Math.max(0, totalOwed - totalPaid);
+
+          return (
+            <div style={{ display: "flex", flexDirection: "column", gap: 16, maxWidth: 900 }}>
+
+              {/* Summary cards */}
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 12 }}>
+                {[
+                  { label: "Total Earned",  value: `USD ${totalOwed.toFixed(2)}`,    color: "#a0c8e8" },
+                  { label: "Total Paid",    value: `USD ${totalPaid.toFixed(2)}`,    color: "#35c060" },
+                  { label: "Balance Due",   value: `USD ${balanceDue.toFixed(2)}`,   color: balanceDue > 0 ? "#e8c547" : "#35c060" },
+                ].map((s) => (
+                  <Card key={s.label} style={{ padding: "18px 22px" }}>
+                    <div style={{ fontSize: 11, color: "#4a7090", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 8 }}>{s.label}</div>
+                    <div style={{ fontSize: 26, fontWeight: 800, color: s.color }}>{s.value}</div>
+                  </Card>
+                ))}
+              </div>
+
+              {/* Transaction table */}
+              <Card style={{ padding: 0, overflow: "hidden" }}>
+                <div style={{ padding: "16px 20px 12px", borderBottom: "1px solid rgba(50,80,140,0.22)" }}>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: "#4a7090", letterSpacing: "0.1em", textTransform: "uppercase" }}>
+                    COMMISSION TRANSACTIONS
+                  </span>
+                  {commissionTxns.length > 0 && (
+                    <span style={{ marginLeft: 10, fontSize: 12, color: "#5ab0f0", fontWeight: 700 }}>{commissionTxns.length}</span>
+                  )}
+                </div>
+
+                {commTxnsLoading ? (
+                  <div style={{ padding: "40px 20px", textAlign: "center", color: "#4a7090", fontSize: 14 }}>Loading…</div>
+                ) : commissionTxns.length === 0 ? (
+                  <div style={{ padding: "48px 20px", textAlign: "center" }}>
+                    <div style={{ fontSize: 32, marginBottom: 12 }}>💰</div>
+                    <div style={{ fontSize: 14, color: "#3a5a70", fontWeight: 600 }}>No commission transactions yet.</div>
+                    <div style={{ fontSize: 13, color: "#2a4050", marginTop: 6 }}>Transactions appear when leads reach Signed or Active status.</div>
+                  </div>
+                ) : (
+                  <div style={{ overflowX: "auto" }}>
+                    <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                      <thead>
+                        <tr style={{ borderBottom: "1px solid rgba(50,80,140,0.35)" }}>
+                          {["Business", "Period Start", "Period End", "Subscription", "Your Commission", "Status"].map((h) => (
+                            <th key={h} style={{ padding: "11px 16px", textAlign: "left", fontSize: 11, color: "#4a7090", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", whiteSpace: "nowrap" }}>
+                              {h}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {commissionTxns.map((tx, i) => {
+                          const businessName = myLeads.find((l) => l.id === tx.lead_id)?.business_name || "—";
+                          const sc = tx.status === "paid"
+                            ? { color: "#35c060", bg: "rgba(40,180,80,0.12)" }
+                            : tx.status === "owed"
+                            ? { color: "#e8c547", bg: "rgba(232,197,71,0.12)" }
+                            : { color: "#5ab0f0", bg: "rgba(100,160,220,0.18)" };
+                          return (
+                            <tr key={tx.id}
+                              style={{ borderBottom: i < commissionTxns.length - 1 ? "1px solid rgba(50,80,140,0.14)" : "none" }}
+                              onMouseEnter={(e) => e.currentTarget.style.background = "rgba(80,140,210,0.07)"}
+                              onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}>
+                              <td style={{ padding: "13px 16px", fontSize: 14, fontWeight: 600, color: "#ffffff" }}>{businessName}</td>
+                              <td style={{ padding: "13px 16px", fontSize: 14, color: "#b0cce0", whiteSpace: "nowrap" }}>{fmtDate(tx.period_start)}</td>
+                              <td style={{ padding: "13px 16px", fontSize: 14, color: "#b0cce0", whiteSpace: "nowrap" }}>{fmtDate(tx.period_end)}</td>
+                              <td style={{ padding: "13px 16px", fontSize: 14, color: "#a0c8e8", whiteSpace: "nowrap" }}>
+                                {tx.subscription_amount != null ? `USD ${Number(tx.subscription_amount).toFixed(2)}` : "—"}
+                              </td>
+                              <td style={{ padding: "13px 16px", fontSize: 14, fontWeight: 700, color: "#e8c547", whiteSpace: "nowrap" }}>
+                                {tx.partner_commission != null ? `USD ${Number(tx.partner_commission).toFixed(2)}` : "—"}
+                              </td>
+                              <td style={{ padding: "13px 16px" }}>
+                                <span style={{ fontSize: 11, fontWeight: 700, padding: "3px 10px", borderRadius: 20, background: sc.bg, color: sc.color, textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                                  {tx.status || "—"}
+                                </span>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </Card>
             </div>
-            <div style={{ fontSize: 13, color: "#4a7090" }}>
-              Earnings are based on signed/active leads minus payouts.
-            </div>
-          </Card>
-        )}
+          );
+        })()}
 
         {/* MY LEADS — list */}
         {tab === "my-leads" && !selectedLead && (

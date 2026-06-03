@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import * as XLSX from "xlsx";
 import { supabase } from "../lib/supabase";
 
 const NAVY = "#0B1739";
@@ -6,59 +7,44 @@ const GOLD = "#E8C547";
 const EARN = ["signed", "active"];
 const STAGES = ["new", "contacted", "demo", "signed", "active", "churned"];
 
-const fmtDate = (iso) => !iso ? "—" : new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+// Readable date string for display
+const fmtDate = (iso) =>
+  !iso ? "" : new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 
-const card = {
-  background: "#fff",
-  borderRadius: 20,
-  border: "1px solid #e5e7eb",
-  boxShadow: "0 1px 4px rgba(0,0,0,0.04), 0 4px 16px rgba(0,0,0,0.04)",
-};
+// Clean export value: null/undefined/"—" → "" so Excel cells are truly empty
+const clean = (v) => (v == null || v === "—") ? "" : String(v);
 
-const TH = ({ children }) => (
-  <th style={{ padding: "11px 20px", textAlign: "left", fontSize: 12, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#374151", whiteSpace: "nowrap" }}>
-    {children}
-  </th>
-);
+// Readable date for export columns (never em-dash)
+const exportDate = (iso) => !iso ? "" : new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 
-const sectionLabel = {
-  fontSize: 13,
-  fontWeight: 700,
-  letterSpacing: "0.1em",
-  textTransform: "uppercase",
-  color: "#374151",
-  margin: 0,
-};
-
-// ── CSV helper ─────────────────────────────────────────────────────────────
-function downloadCSV(filename, headers, rows) {
-  const escape = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
-  const lines = [headers.join(","), ...rows.map((r) => r.map(escape).join(","))];
-  const blob = new Blob([lines.join("\r\n")], { type: "text/csv;charset=utf-8;" });
-  const url  = URL.createObjectURL(blob);
-  const a    = document.createElement("a");
-  a.href     = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+// ── Excel helper ───────────────────────────────────────────────────────────
+// sheets: [{ name, headers: string[], rows: (string|number)[][] }]
+function toXLSX(filename, sheets) {
+  const wb = XLSX.utils.book_new();
+  sheets.forEach(({ name, headers, rows }) => {
+    const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+    // Auto-width: set each column to the max content length
+    const maxLens = headers.map((h, ci) =>
+      Math.max(h.length, ...rows.map((r) => String(r[ci] ?? "").length))
+    );
+    ws["!cols"] = maxLens.map((w) => ({ wch: Math.min(w + 2, 50) }));
+    XLSX.utils.book_append_sheet(wb, ws, name.slice(0, 31)); // sheet name ≤ 31 chars
+  });
+  XLSX.writeFile(wb, filename);
 }
 
-// ── PDF helper — opens a formatted print window ────────────────────────────
+// ── PDF helper ─────────────────────────────────────────────────────────────
 function printReport(title, sections) {
   const ts = new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
-
   const tableHtml = ({ heading, headers, rows }) => `
     <h2>${heading}</h2>
     <table>
       <thead><tr>${headers.map((h) => `<th>${h}</th>`).join("")}</tr></thead>
-      <tbody>${rows.map((r) => `<tr>${r.map((c) => `<td>${c ?? "—"}</td>`).join("")}</tr>`).join("")}</tbody>
+      <tbody>${rows.map((r) => `<tr>${r.map((c) => `<td>${clean(c)}</td>`).join("")}</tr>`).join("")}</tbody>
     </table>`;
-
   const html = `<!DOCTYPE html><html><head><title>${title}</title>
   <style>
-    body { font-family: system-ui, -apple-system, sans-serif; font-size: 13px; color: #111; margin: 32px; }
+    body { font-family: system-ui,-apple-system,sans-serif; font-size: 13px; color: #111; margin: 32px; }
     h1   { font-size: 22px; font-weight: 800; margin: 0 0 4px; }
     .sub { font-size: 13px; color: #666; margin: 0 0 28px; }
     h2   { font-size: 13px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: #444; margin: 28px 0 8px; border-top: 1px solid #e5e7eb; padding-top: 16px; }
@@ -73,13 +59,26 @@ function printReport(title, sections) {
     <p class="sub">Generated ${ts} · QR-Wegn Partner Network</p>
     ${sections.map(tableHtml).join("")}
   </body></html>`;
-
   const win = window.open("", "_blank");
   if (!win) { alert("Allow pop-ups to export PDF."); return; }
   win.document.write(html);
   win.document.close();
   win.onload = () => { win.focus(); win.print(); };
 }
+
+// ── Shared styles ──────────────────────────────────────────────────────────
+const card = {
+  background: "#fff",
+  borderRadius: 20,
+  border: "1px solid #e5e7eb",
+  boxShadow: "0 1px 4px rgba(0,0,0,0.04), 0 4px 16px rgba(0,0,0,0.04)",
+};
+const TH = ({ children }) => (
+  <th style={{ padding: "11px 20px", textAlign: "left", fontSize: 12, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#374151", whiteSpace: "nowrap" }}>
+    {children}
+  </th>
+);
+const sectionLabel = { fontSize: 13, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "#374151", margin: 0 };
 
 // ── Component ──────────────────────────────────────────────────────────────
 export default function ReportsPage({ navigate }) {
@@ -107,13 +106,11 @@ export default function ReportsPage({ navigate }) {
   // ── Commission summary ────────────────────────────────────────────────────
   const commMap = {};
   const upsert = (key, init) => { if (!commMap[key]) commMap[key] = { ...init, owed: 0, paid: 0 }; };
-
   promotors.forEach((pr) => {
     leads.forEach((l) => {
       if (l.submitted_by_promotor_id !== pr.id || !EARN.includes(l.status)) return;
       if (l.monthly_value == null || l.promotor_pct == null) return;
-      const cur = l.currency || "USD";
-      const key = `promotor:${pr.id}:${cur}`;
+      const cur = l.currency || "USD"; const key = `promotor:${pr.id}:${cur}`;
       upsert(key, { name: pr.full_name, role: "Promotor", currency: cur });
       commMap[key].owed += l.monthly_value * l.promotor_pct / 100;
     });
@@ -122,8 +119,7 @@ export default function ReportsPage({ navigate }) {
     leads.forEach((l) => {
       if (l.regional_partner_id !== pa.id || !EARN.includes(l.status)) return;
       if (l.monthly_value == null || l.partner_pct == null) return;
-      const cur = l.currency || "USD";
-      const key = `partner:${pa.id}:${cur}`;
+      const cur = l.currency || "USD"; const key = `partner:${pa.id}:${cur}`;
       upsert(key, { name: pa.full_name, role: "Partner", currency: cur });
       commMap[key].owed += l.monthly_value * l.partner_pct / 100;
     });
@@ -148,124 +144,88 @@ export default function ReportsPage({ navigate }) {
   const totalDue  = commRows.reduce((s, r) => s + Math.max(0, r.owed - r.paid), 0);
 
   // ── Pipeline summary ──────────────────────────────────────────────────────
-  const stageCounts = STAGES.reduce((acc, s) => ({
-    ...acc, [s]: leads.filter((l) => (l.status || "new") === s).length,
-  }), {});
-  const mrr = leads
-    .filter((l) => EARN.includes(l.status) && l.monthly_value)
-    .reduce((s, l) => s + Number(l.monthly_value), 0);
+  const stageCounts = STAGES.reduce((acc, s) => ({ ...acc, [s]: leads.filter((l) => (l.status || "new") === s).length }), {});
+  const mrr = leads.filter((l) => EARN.includes(l.status) && l.monthly_value).reduce((s, l) => s + Number(l.monthly_value), 0);
+
+  // ── Prepared row sets (clean values, no em-dashes) ────────────────────────
+  const commSheetRows = commRows.map((r) => {
+    const bal  = Math.max(0, r.owed - r.paid);
+    const over = r.paid > r.owed ? r.paid - r.owed : 0;
+    return [clean(r.name), clean(r.role), clean(r.currency), r.owed.toFixed(2), r.paid.toFixed(2), bal.toFixed(2), over > 0 ? over.toFixed(2) : ""];
+  });
+
+  const payoutSheetRows = payouts.map((p) => [
+    exportDate(p.paid_on),
+    clean(p.beneficiary),
+    clean(p.beneficiary_type),
+    Number(p.amount).toFixed(2),
+    clean(p.currency) || "USD",
+    clean(p.note),
+  ]);
+
+  const pipelineSheetRows = STAGES.map((s) => {
+    const count    = stageCounts[s] || 0;
+    const pct      = leads.length > 0 ? Math.round((count / leads.length) * 100) : 0;
+    const stageMrr = EARN.includes(s)
+      ? leads.filter((l) => l.status === s && l.monthly_value).reduce((sum, l) => sum + Number(l.monthly_value), 0)
+      : null;
+    return [s, count, pct, stageMrr != null ? stageMrr.toFixed(2) : ""];
+  });
 
   // ── Export handlers ───────────────────────────────────────────────────────
+  const exportCommXLSX = () => toXLSX("commission-summary.xlsx", [{
+    name: "Commission Summary",
+    headers: ["Person", "Role", "Currency", "Owed", "Paid", "Balance", "Overpaid"],
+    rows: commSheetRows,
+  }]);
 
-  // Commission Summary CSV
-  const exportCommCSV = () => downloadCSV(
-    "commission-summary.csv",
-    ["Person", "Role", "Currency", "Owed", "Paid", "Balance", "Overpaid"],
-    commRows.map((r) => {
-      const bal  = Math.max(0, r.owed - r.paid);
-      const over = r.paid > r.owed ? r.paid - r.owed : 0;
-      return [r.name, r.role, r.currency, r.owed.toFixed(2), r.paid.toFixed(2), bal.toFixed(2), over.toFixed(2)];
-    })
-  );
+  const exportPayoutsXLSX = () => toXLSX("payout-history.xlsx", [{
+    name: "Payout History",
+    headers: ["Date", "Beneficiary", "Role", "Amount", "Currency", "Note"],
+    rows: payoutSheetRows,
+  }]);
 
-  // Payout History CSV
-  const exportPayoutsCSV = () => downloadCSV(
-    "payout-history.csv",
-    ["Date", "Beneficiary", "Role", "Amount", "Currency", "Note"],
-    payouts.map((p) => [fmtDate(p.paid_on), p.beneficiary || "", p.beneficiary_type || "", Number(p.amount).toFixed(2), p.currency || "USD", p.note || ""])
-  );
+  const exportPipelineXLSX = () => toXLSX("lead-pipeline.xlsx", [{
+    name: "Lead Pipeline",
+    headers: ["Stage", "Count", "% of Total", "MRR Contribution"],
+    rows: pipelineSheetRows,
+  }]);
 
-  // Pipeline CSV
-  const exportPipelineCSV = () => downloadCSV(
-    "lead-pipeline.csv",
-    ["Stage", "Count", "% of Total", "MRR Contribution"],
-    STAGES.map((s) => {
-      const count = stageCounts[s] || 0;
-      const pct   = leads.length > 0 ? Math.round((count / leads.length) * 100) : 0;
-      const stageMrr = EARN.includes(s)
-        ? leads.filter((l) => l.status === s && l.monthly_value).reduce((sum, l) => sum + Number(l.monthly_value), 0)
-        : null;
-      return [s, count, `${pct}%`, stageMrr != null ? stageMrr.toFixed(2) : "—"];
-    })
-  );
-
-  // Full report CSV (all sections combined)
-  const exportAllCSV = () => {
+  const exportAllXLSX = () => {
     const ts = new Date().toISOString().slice(0, 10);
-    const lines = [
-      // Commission section
-      "COMMISSION SUMMARY",
-      ["Person", "Role", "Currency", "Owed", "Paid", "Balance"].join(","),
-      ...commRows.map((r) => {
-        const bal = Math.max(0, r.owed - r.paid);
-        return [r.name, r.role, r.currency, r.owed.toFixed(2), r.paid.toFixed(2), bal.toFixed(2)].map((v) => `"${v}"`).join(",");
-      }),
-      "",
-      // Payouts section
-      "PAYOUT HISTORY",
-      ["Date", "Beneficiary", "Role", "Amount", "Currency", "Note"].join(","),
-      ...payouts.map((p) => [fmtDate(p.paid_on), p.beneficiary || "", p.beneficiary_type || "", Number(p.amount).toFixed(2), p.currency || "USD", p.note || ""].map((v) => `"${v}"`).join(",")),
-      "",
-      // Pipeline section
-      "LEAD PIPELINE",
-      ["Stage", "Count", "% of Total", "MRR Contribution"].join(","),
-      ...STAGES.map((s) => {
-        const count = stageCounts[s] || 0;
-        const pct   = leads.length > 0 ? Math.round((count / leads.length) * 100) : 0;
-        const stageMrr = EARN.includes(s)
-          ? leads.filter((l) => l.status === s && l.monthly_value).reduce((sum, l) => sum + Number(l.monthly_value), 0)
-          : null;
-        return [`"${s}"`, count, `"${pct}%"`, stageMrr != null ? stageMrr.toFixed(2) : `"—"`].join(",");
-      }),
-    ];
-    const blob = new Blob([lines.join("\r\n")], { type: "text/csv;charset=utf-8;" });
-    const url  = URL.createObjectURL(blob);
-    const a    = document.createElement("a");
-    a.href     = url;
-    a.download = `qrwegn-report-${ts}.csv`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    toXLSX(`qrwegn-report-${ts}.xlsx`, [
+      { name: "Commission Summary", headers: ["Person", "Role", "Currency", "Owed", "Paid", "Balance", "Overpaid"], rows: commSheetRows },
+      { name: "Payout History",     headers: ["Date", "Beneficiary", "Role", "Amount", "Currency", "Note"],         rows: payoutSheetRows },
+      { name: "Lead Pipeline",      headers: ["Stage", "Count", "% of Total", "MRR Contribution"],                  rows: pipelineSheetRows },
+    ]);
   };
 
-  // Full report PDF
   const exportAllPDF = () => printReport("QR-Wegn Partner Report", [
     {
       heading: "Commission Summary",
       headers: ["Person", "Role", "Currency", "Owed", "Paid", "Balance"],
-      rows: commRows.map((r) => {
-        const bal = Math.max(0, r.owed - r.paid);
-        return [r.name, r.role, r.currency, `${r.currency} ${r.owed.toFixed(2)}`, `${r.currency} ${r.paid.toFixed(2)}`, `${r.currency} ${bal.toFixed(2)}`];
-      }),
+      rows: commRows.map((r) => { const bal = Math.max(0, r.owed - r.paid); return [clean(r.name), clean(r.role), clean(r.currency), `${r.currency} ${r.owed.toFixed(2)}`, `${r.currency} ${r.paid.toFixed(2)}`, `${r.currency} ${bal.toFixed(2)}`]; }),
     },
     {
       heading: `Payout History (${payouts.length})`,
       headers: ["Date", "Beneficiary", "Role", "Amount", "Note"],
-      rows: payouts.map((p) => [fmtDate(p.paid_on), p.beneficiary || "—", p.beneficiary_type || "—", `${p.currency || "USD"} ${Number(p.amount).toLocaleString()}`, p.note || "—"]),
+      rows: payouts.map((p) => [exportDate(p.paid_on), clean(p.beneficiary), clean(p.beneficiary_type), `${p.currency || "USD"} ${Number(p.amount).toLocaleString()}`, clean(p.note)]),
     },
     {
       heading: "Lead Pipeline Summary",
       headers: ["Stage", "Count", "% of Total", "MRR Contribution"],
-      rows: STAGES.map((s) => {
-        const count = stageCounts[s] || 0;
-        const pct   = leads.length > 0 ? Math.round((count / leads.length) * 100) : 0;
-        const stageMrr = EARN.includes(s)
-          ? leads.filter((l) => l.status === s && l.monthly_value).reduce((sum, l) => sum + Number(l.monthly_value), 0)
-          : null;
-        return [s, count, `${pct}%`, stageMrr != null ? `$${stageMrr.toLocaleString()}` : "—"];
-      }),
+      rows: pipelineSheetRows.map(([s, c, pct, m]) => [s, c, `${pct}%`, m ? `$${parseFloat(m).toLocaleString()}` : ""]),
     },
   ]);
 
-  // Reusable active export button
-  const ExportBtn = ({ label, onClick }) => (
+  // ── Export button (active) ─────────────────────────────────────────────────
+  const ExportBtn = ({ label, onClick, icon = "↓" }) => (
     <button
       onClick={onClick}
-      style={{ fontSize: 13, fontWeight: 600, padding: "8px 18px", borderRadius: 10, border: `1px solid ${NAVY}`, background: "#fff", color: NAVY, cursor: "pointer", transition: "all 0.15s" }}
+      style={{ fontSize: 13, fontWeight: 600, padding: "8px 18px", borderRadius: 10, border: `1px solid ${NAVY}`, background: "#fff", color: NAVY, cursor: "pointer", transition: "all 0.15s", display: "flex", alignItems: "center", gap: 6 }}
       onMouseEnter={(e) => { e.currentTarget.style.background = NAVY; e.currentTarget.style.color = "#fff"; }}
       onMouseLeave={(e) => { e.currentTarget.style.background = "#fff"; e.currentTarget.style.color = NAVY; }}>
-      ↓ {label}
+      <span>{icon}</span> {label}
     </button>
   );
 
@@ -290,8 +250,8 @@ export default function ReportsPage({ navigate }) {
           <h1 style={{ fontSize: 22, fontWeight: 800, color: "#111827", margin: 0, letterSpacing: "-0.02em" }}>Reports</h1>
         </div>
         <div style={{ display: "flex", gap: 10 }}>
-          <ExportBtn label="Export PDF" onClick={exportAllPDF} />
-          <ExportBtn label="Export CSV" onClick={exportAllCSV} />
+          <ExportBtn label="Export PDF"   onClick={exportAllPDF}  icon="🖨" />
+          <ExportBtn label="Export Excel" onClick={exportAllXLSX} icon="📊" />
         </div>
       </div>
 
@@ -316,24 +276,19 @@ export default function ReportsPage({ navigate }) {
         <div style={{ ...card, overflow: "hidden" }}>
           <div style={{ padding: "22px 28px 16px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <p style={sectionLabel}>Commission Summary</p>
-            <ExportBtn label="Export CSV" onClick={exportCommCSV} />
+            <ExportBtn label="Export Excel" onClick={exportCommXLSX} icon="📊" />
           </div>
           {commRows.length === 0 ? (
             <p style={{ padding: "24px 28px", fontSize: 15, color: "#374151" }}>No commission data yet. Commissions accrue when leads reach Signed or Active status.</p>
           ) : (
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
-              <thead>
-                <tr style={{ borderTop: "1px solid #f3f4f6" }}>
-                  <TH>Person</TH><TH>Role</TH><TH>Currency</TH><TH>Owed</TH><TH>Paid</TH><TH>Balance</TH>
-                </tr>
-              </thead>
+              <thead><tr style={{ borderTop: "1px solid #f3f4f6" }}><TH>Person</TH><TH>Role</TH><TH>Currency</TH><TH>Owed</TH><TH>Paid</TH><TH>Balance</TH></tr></thead>
               <tbody>
                 {commRows.map((r) => {
                   const bal  = Math.max(0, r.owed - r.paid);
                   const over = r.paid > r.owed ? r.paid - r.owed : 0;
                   return (
-                    <tr key={`${r.role}:${r.name}:${r.currency}`}
-                      style={{ borderTop: "1px solid #f3f4f6" }}
+                    <tr key={`${r.role}:${r.name}:${r.currency}`} style={{ borderTop: "1px solid #f3f4f6" }}
                       onMouseEnter={(e) => e.currentTarget.style.background = "#fafafa"}
                       onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}>
                       <td style={{ padding: "14px 20px", fontSize: 15, fontWeight: 600, color: "#111827" }}>{r.name}</td>
@@ -357,21 +312,16 @@ export default function ReportsPage({ navigate }) {
         <div style={{ ...card, overflow: "hidden" }}>
           <div style={{ padding: "22px 28px 16px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <p style={sectionLabel}>Payout History <span style={{ fontWeight: 400, textTransform: "none", letterSpacing: 0, color: "#374151" }}>({payouts.length})</span></p>
-            <ExportBtn label="Export CSV" onClick={exportPayoutsCSV} />
+            <ExportBtn label="Export Excel" onClick={exportPayoutsXLSX} icon="📊" />
           </div>
           {payouts.length === 0 ? (
             <p style={{ padding: "24px 28px", fontSize: 15, color: "#374151" }}>No payouts recorded yet.</p>
           ) : (
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
-              <thead>
-                <tr style={{ borderTop: "1px solid #f3f4f6" }}>
-                  <TH>Date</TH><TH>Beneficiary</TH><TH>Role</TH><TH>Amount</TH><TH>Note</TH>
-                </tr>
-              </thead>
+              <thead><tr style={{ borderTop: "1px solid #f3f4f6" }}><TH>Date</TH><TH>Beneficiary</TH><TH>Role</TH><TH>Amount</TH><TH>Note</TH></tr></thead>
               <tbody>
                 {payouts.slice(0, 15).map((p) => (
-                  <tr key={p.id}
-                    style={{ borderTop: "1px solid #f3f4f6" }}
+                  <tr key={p.id} style={{ borderTop: "1px solid #f3f4f6" }}
                     onMouseEnter={(e) => e.currentTarget.style.background = "#fafafa"}
                     onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}>
                     <td style={{ padding: "14px 20px", fontSize: 14, color: "#374151", whiteSpace: "nowrap" }}>{fmtDate(p.paid_on)}</td>
@@ -391,7 +341,7 @@ export default function ReportsPage({ navigate }) {
         <div style={{ ...card, padding: "28px 32px" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
             <p style={sectionLabel}>Lead Pipeline Summary</p>
-            <ExportBtn label="Export CSV" onClick={exportPipelineCSV} />
+            <ExportBtn label="Export Excel" onClick={exportPipelineXLSX} icon="📊" />
           </div>
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead>
@@ -403,8 +353,8 @@ export default function ReportsPage({ navigate }) {
             </thead>
             <tbody>
               {STAGES.map((s) => {
-                const count = stageCounts[s] || 0;
-                const pct   = leads.length > 0 ? Math.round((count / leads.length) * 100) : 0;
+                const count    = stageCounts[s] || 0;
+                const pct      = leads.length > 0 ? Math.round((count / leads.length) * 100) : 0;
                 const stageMrr = EARN.includes(s)
                   ? leads.filter((l) => l.status === s && l.monthly_value).reduce((sum, l) => sum + Number(l.monthly_value), 0)
                   : null;

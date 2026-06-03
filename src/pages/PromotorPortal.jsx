@@ -125,6 +125,7 @@ export default function PromotorPortal({ profile, onLogout }) {
   const [leadsLoading, setLeadsLoading] = useState(false);
   const [leadsLoaded,  setLeadsLoaded] = useState(false);
   const [myPayouts,    setMyPayouts]   = useState([]);
+  const [promotorId,   setPromotorId]  = useState(null);
   const [demoLinks,    setDemoLinks]   = useState([]);
   const [training,      setTraining]     = useState(DEFAULT_TRAINING);
   const [materials,     setMaterials]    = useState(DEFAULT_MATERIALS);
@@ -136,30 +137,73 @@ export default function PromotorPortal({ profile, onLogout }) {
   const firstName = profile?.full_name?.split(" ")[0] || "Promotor";
 
   useEffect(() => {
-    supabase.from("leads").select("*").order("created_at", { ascending: false }).then(({ data, error }) => {
-      if (!error) { setMyLeads(data || []); setLeadsLoaded(true); }
-    });
-    supabase.from("payouts").select("*").order("paid_on", { ascending: false }).then(({ data, error }) => {
-      if (!error) setMyPayouts(data || []);
-    });
-    supabase.from("demo_links").select("*").order("created_at", { ascending: false }).then(({ data, error }) => {
-      if (!error) setDemoLinks(data || []);
-    });
-    supabase.from("training_materials").select("*").order("created_at", { ascending: false }).then(({ data, error }) => {
-      if (!error && data?.length) setTraining(data);
-    });
-    supabase.from("sales_materials").select("*").order("created_at", { ascending: false }).then(({ data, error }) => {
-      if (!error && data?.length) setMaterials(data);
-    });
+    const init = async () => {
+      // 1. Resolve this user's promotor_id from the profiles table
+      const { data: { user } } = await supabase.auth.getUser();
+      let pId = null;
+      if (user) {
+        const { data: profileRow } = await supabase
+          .from("profiles")
+          .select("promotor_id")
+          .eq("id", user.id)
+          .single();
+        pId = profileRow?.promotor_id ?? null;
+        setPromotorId(pId);
+      }
+
+      // 2. Leads — filtered to this promotor only
+      if (pId) {
+        supabase
+          .from("leads")
+          .select("*")
+          .eq("submitted_by_promotor_id", pId)
+          .order("created_at", { ascending: false })
+          .then(({ data, error }) => {
+            if (!error) { setMyLeads(data || []); setLeadsLoaded(true); }
+          });
+
+        // 3. Payouts — filtered to this promotor only
+        supabase
+          .from("payouts")
+          .select("*")
+          .eq("beneficiary_type", "promotor")
+          .eq("beneficiary_id", pId)
+          .order("paid_on", { ascending: false })
+          .then(({ data, error }) => {
+            if (!error) setMyPayouts(data || []);
+          });
+      } else {
+        // No promotor link yet — show empty rather than all rows
+        setLeadsLoaded(true);
+      }
+
+      // 4. Unfiltered global content
+      supabase.from("demo_links").select("*").order("created_at", { ascending: false }).then(({ data, error }) => {
+        if (!error) setDemoLinks(data || []);
+      });
+      supabase.from("training_materials").select("*").order("created_at", { ascending: false }).then(({ data, error }) => {
+        if (!error && data?.length) setTraining(data);
+      });
+      supabase.from("sales_materials").select("*").order("created_at", { ascending: false }).then(({ data, error }) => {
+        if (!error && data?.length) setMaterials(data);
+      });
+    };
+
+    init();
   }, []);
 
   const switchTab = async (id) => {
     setTabState(id);
     if (id === "my-leads" && !leadsLoaded) {
       setLeadsLoading(true);
-      const { data } = await supabase
-        .from("leads").select("*").order("created_at", { ascending: false });
-      setMyLeads(data || []);
+      if (promotorId) {
+        const { data } = await supabase
+          .from("leads")
+          .select("*")
+          .eq("submitted_by_promotor_id", promotorId)
+          .order("created_at", { ascending: false });
+        setMyLeads(data || []);
+      }
       setLeadsLoaded(true);
       setLeadsLoading(false);
     }
@@ -170,18 +214,14 @@ export default function PromotorPortal({ profile, onLogout }) {
     setLeadSaving(true);
     setLeadError("");
 
-    const { data: { user } } = await supabase.auth.getUser();
-    const { data: profileRow } = await supabase
-      .from("profiles").select("promotor_id").eq("id", user.id).single();
-
-    if (!profileRow?.promotor_id) {
+    if (!promotorId) {
       setLeadSaving(false);
       setLeadError("Your account isn't linked to a promotor record. Contact admin.");
       return;
     }
 
     const { error } = await supabase.from("leads").insert({
-      submitted_by_promotor_id: profileRow.promotor_id,
+      submitted_by_promotor_id: promotorId,
       business_name: lead.business_name.trim(),
       contact_name:  lead.owner_name.trim(),
       phone:         lead.phone.trim(),

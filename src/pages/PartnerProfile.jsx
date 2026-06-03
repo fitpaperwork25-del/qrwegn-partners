@@ -76,7 +76,8 @@ export default function PartnerProfile({ partnerId, navigate }) {
   const [subPartners,      setSubPartners]      = useState([]);
   const [promotors,        setPromotors]        = useState([]);
   const [leads,            setLeads]            = useState([]);
-  const [partnerPayouts,   setPartnerPayouts]   = useState([]);
+  const [partnerPayouts,        setPartnerPayouts]        = useState([]);
+  const [commissionTransactions, setCommissionTransactions] = useState([]);
   const [dataLoading,      setDataLoading]      = useState(false);
   const [linkCopied,       setLinkCopied]       = useState(false);
   const [approvingId,      setApprovingId]      = useState(null);
@@ -154,7 +155,7 @@ export default function PartnerProfile({ partnerId, navigate }) {
     if (!partnerId) return;
     setDataLoading(true);
     const load = async () => {
-      const [promotorRes, subPartnerRes, leadRes, payoutRes] = await Promise.all([
+      const [promotorRes, subPartnerRes, leadRes, payoutRes, txRes] = await Promise.all([
         supabase.from("promotors").select("*").eq("partner_id", partnerId).order("full_name"),
         supabase.from("partners").select("*").eq("parent_partner_id", partnerId).order("full_name"),
         supabase
@@ -167,11 +168,16 @@ export default function PartnerProfile({ partnerId, navigate }) {
           .select("*")
           .eq("partner_id", partnerId)
           .order("payout_date", { ascending: false }),
+        supabase
+          .from("commission_transactions")
+          .select("*")
+          .eq("partner_id", partnerId),
       ]);
       if (!promotorRes.error)   setPromotors(promotorRes.data || []);
       if (!subPartnerRes.error) setSubPartners(subPartnerRes.data || []);
       if (!leadRes.error)       setLeads(leadRes.data || []);
       if (!payoutRes.error)     setPartnerPayouts(payoutRes.data || []);
+      if (!txRes.error)         setCommissionTransactions(txRes.data || []);
 
       // Pre-check which promotors already have a login profile
       const pIds = (promotorRes.data || []).map(p => p.id).filter(Boolean);
@@ -268,15 +274,15 @@ export default function PartnerProfile({ partnerId, navigate }) {
 
   // ── Computed values ───────────────────────────────────────────────
 
-  // Per-currency earnings summary for this partner
+  // Per-currency earnings summary — owed from commission_transactions, paid from partner_payouts
   const earningsByCurrency = (() => {
     const map = {};
-    leads
-      .filter(l => EARNING_STATUSES.includes(l.status) && l.monthly_value != null && l.partner_pct != null)
-      .forEach(l => {
-        const cur = l.currency || "USD";
+    commissionTransactions
+      .filter(t => t.status === "owed")
+      .forEach(t => {
+        const cur = t.currency || "USD";
         if (!map[cur]) map[cur] = { owed: 0, paid: 0 };
-        map[cur].owed += l.monthly_value * l.partner_pct / 100;
+        map[cur].owed += Number(t.partner_commission || 0);
       });
     partnerPayouts.forEach(p => {
       const cur = p.currency || "USD";

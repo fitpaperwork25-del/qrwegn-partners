@@ -512,9 +512,17 @@ export default function PartnerPortal({ profile, onLogout }) {
     loadMyLeads();
   };
 
-  const doneCount = checklist.filter((item) => item.completed).length;
-  const totalCount = checklist.length;
-  const pct = totalCount > 0 ? Math.round((doneCount / totalCount) * 100) : 0;
+  // Auto-derive onboarding progress from already-loaded data — no manual DB check-off needed
+  const autoChecklist = [
+    { key: "profile",    label: "Profile complete",              done: Boolean(profile?.full_name),                                              section: "home"         },
+    { key: "promotor",   label: "Promotor recruited",            done: promotors.length > 0,                                                     section: "my-promotors" },
+    { key: "lead",       label: "First lead submitted",          done: myLeads.length > 0,                                                       section: "leads"        },
+    { key: "signed",     label: "First lead signed or active",   done: myLeads.some((l) => ["signed", "active"].includes(l.status)),             section: "my-leads"     },
+    { key: "commission", label: "Commission record exists",      done: commissionTxns.length > 0,                                                section: "commissions"  },
+  ];
+  const doneCount  = autoChecklist.filter((c) => c.done).length;
+  const totalCount = autoChecklist.length;
+  const pct        = Math.round((doneCount / totalCount) * 100);
 
   const earningRows = useMemo(() => {
     const earningStatuses = ["signed", "active"];
@@ -1136,18 +1144,15 @@ export default function PartnerPortal({ profile, onLogout }) {
               <Card>
                 <SectionLabel>ONBOARDING CHECKLIST</SectionLabel>
 
-                {checklist.map((item) => (
+                {autoChecklist.map((item) => (
                   <div
-                    key={item.item_key}
-                    onClick={() => toggleCheck(item)}
+                    key={item.key}
                     style={{
                       display: "flex",
                       alignItems: "center",
                       gap: 12,
                       padding: "11px 0",
                       borderBottom: "1px solid rgba(50,80,140,0.18)",
-                      cursor: "pointer",
-                      userSelect: "none",
                     }}
                   >
                     <div
@@ -1156,54 +1161,28 @@ export default function PartnerPortal({ profile, onLogout }) {
                         height: 20,
                         borderRadius: 5,
                         border: "1.5px solid",
-                        borderColor: item.completed
-                          ? "#5ab0f0"
-                          : "rgba(80,130,180,0.28)",
-                        background: item.completed ? "#5ab0f0" : "transparent",
+                        borderColor: item.done ? "#5ab0f0" : "rgba(80,130,180,0.28)",
+                        background: item.done ? "#5ab0f0" : "transparent",
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
                         flexShrink: 0,
                       }}
                     >
-                      {item.completed && (
+                      {item.done && (
                         <svg width="11" height="9" viewBox="0 0 11 9" fill="none">
-                          <path
-                            d="M1 4L4 7L10 1"
-                            stroke="white"
-                            strokeWidth="1.8"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                          />
+                          <path d="M1 4L4 7L10 1" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
                         </svg>
                       )}
                     </div>
 
                     <div style={{ flex: 1 }}>
-                      <div
-                        style={{
-                          fontSize: 14,
-                          color: item.completed ? "#3a5a70" : "#b0cce0",
-                          textDecoration: item.completed ? "line-through" : "none",
-                          lineHeight: 1.4,
-                        }}
-                      >
+                      <div style={{ fontSize: 14, color: item.done ? "#3a5a70" : "#b0cce0", textDecoration: item.done ? "line-through" : "none", lineHeight: 1.4 }}>
                         {item.label}
                       </div>
                       <button
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          setTab(item.section);
-                        }}
-                        style={{
-                          marginTop: 4,
-                          background: "none",
-                          border: "none",
-                          color: "#5ab0f0",
-                          fontSize: 12,
-                          cursor: "pointer",
-                          padding: 0,
-                        }}
+                        onClick={() => setTab(item.section)}
+                        style={{ marginTop: 4, background: "none", border: "none", color: "#5ab0f0", fontSize: 12, cursor: "pointer", padding: 0 }}
                       >
                         Go to section
                       </button>

@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { supabase } from "../lib/supabase";
+import OnboardingChecklist from "../components/OnboardingChecklist";
 
 const TABS = [
   { id: "home",      label: "Home"         },
@@ -295,6 +296,7 @@ export default function PromotorPortal({ profile, onLogout }) {
         {/* HOME */}
         {tab === "home" && (
           <div style={{ display: "flex", flexDirection: "column", gap: 16, maxWidth: 540 }}>
+            <OnboardingChecklist supabase={supabase} userId={profile.id} role="promotor" />
             {(() => {
               const EARNING_STATUSES = ["signed", "active"];
               const owedByCurrency = {};

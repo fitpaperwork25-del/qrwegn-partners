@@ -78,7 +78,9 @@ const DEFAULT_MATERIALS = [
   },
 ];
 
-const emptyLead = { business_name: "", owner_name: "", phone: "", country: "", notes: "" };
+const emptyLead = { business_name: "", owner_name: "", phone: "", country: "", plan: "", notes: "" };
+
+const PLAN_VALUES = { Starter: 49, Pro: 99, Enterprise: 199 };
 
 const Card = ({ children, style = {} }) => (
   <div style={{
@@ -210,7 +212,7 @@ export default function PromotorPortal({ profile, onLogout }) {
   };
 
   const submitLead = async () => {
-    if (!lead.business_name.trim() || !profile?.id) return;
+    if (!lead.business_name.trim() || !lead.plan || !profile?.id) return;
     setLeadSaving(true);
     setLeadError("");
 
@@ -222,11 +224,14 @@ export default function PromotorPortal({ profile, onLogout }) {
 
     const { error } = await supabase.from("leads").insert({
       submitted_by_promotor_id: promotorId,
-      business_name: lead.business_name.trim(),
-      contact_name:  lead.owner_name.trim(),
-      phone:         lead.phone.trim(),
-      country:       lead.country.trim(),
-      notes:         lead.notes.trim(),
+      business_name:  lead.business_name.trim(),
+      contact_name:   lead.owner_name.trim(),
+      phone:          lead.phone.trim(),
+      country:        lead.country.trim(),
+      notes:          lead.notes.trim(),
+      plan:           lead.plan,
+      monthly_value:  PLAN_VALUES[lead.plan] ?? null,
+      currency:       "USD",
     });
     setLeadSaving(false);
     if (error) {
@@ -415,6 +420,22 @@ export default function PromotorPortal({ profile, onLogout }) {
               ))}
 
               <div>
+                <label style={{ fontSize: 11, fontWeight: 700, color: "#4a7090", letterSpacing: "0.08em", display: "block", marginBottom: 5 }}>
+                  PLAN<span style={{ color: "#e8c547", marginLeft: 3 }}>*</span>
+                </label>
+                <select
+                  value={lead.plan}
+                  onChange={e => setLead(l => ({ ...l, plan: e.target.value }))}
+                  style={{ ...inputStyle, cursor: "pointer" }}
+                >
+                  <option value="">Select a plan…</option>
+                  <option value="Starter">Starter — $49/mo</option>
+                  <option value="Pro">Pro — $99/mo</option>
+                  <option value="Enterprise">Enterprise — $199/mo</option>
+                </select>
+              </div>
+
+              <div>
                 <label style={{ fontSize: 11, fontWeight: 700, color: "#4a7090", letterSpacing: "0.08em", display: "block", marginBottom: 5 }}>NOTES</label>
                 <textarea
                   value={lead.notes}
@@ -427,16 +448,16 @@ export default function PromotorPortal({ profile, onLogout }) {
 
               <button
                 onClick={submitLead}
-                disabled={leadSaving || !lead.business_name.trim()}
+                disabled={leadSaving || !lead.business_name.trim() || !lead.plan}
                 style={{
                   padding: "12px 0", borderRadius: 10, border: "none",
-                  background: leadSaving || !lead.business_name.trim()
+                  background: leadSaving || !lead.business_name.trim() || !lead.plan
                     ? "rgba(80,140,210,0.18)"
                     : "linear-gradient(135deg, #3a9ad9, #2a7ab8)",
-                  color: leadSaving || !lead.business_name.trim() ? "#3a5a70" : "white",
+                  color: leadSaving || !lead.business_name.trim() || !lead.plan ? "#3a5a70" : "white",
                   fontSize: 14, fontWeight: 700,
-                  cursor: leadSaving || !lead.business_name.trim() ? "default" : "pointer",
-                  boxShadow: leadSaving || !lead.business_name.trim() ? "none" : "0 4px 16px rgba(42,122,184,0.28)",
+                  cursor: leadSaving || !lead.business_name.trim() || !lead.plan ? "default" : "pointer",
+                  boxShadow: leadSaving || !lead.business_name.trim() || !lead.plan ? "none" : "0 4px 16px rgba(42,122,184,0.28)",
                   transition: "all 0.15s",
                 }}
               >

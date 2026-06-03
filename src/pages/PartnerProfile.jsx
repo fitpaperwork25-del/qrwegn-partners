@@ -85,6 +85,15 @@ export default function PartnerProfile({ partnerId, navigate }) {
   const [loginLinks,       setLoginLinks]       = useState({});
   const [linkCopiedId,     setLinkCopiedId]     = useState(null);
 
+  // Payout modal
+  const [showPayoutModal,  setShowPayoutModal]  = useState(false);
+  const [savingPayout,     setSavingPayout]     = useState(false);
+  const [payoutError,      setPayoutError]      = useState("");
+  const [payoutForm,       setPayoutForm]       = useState({
+    amount: "", currency: "USD", payment_method: "Bank Transfer",
+    payout_date: new Date().toISOString().slice(0, 10), notes: "",
+  });
+
   // ── Loaders ──────────────────────────────────────────────────────
 
   useEffect(() => {
@@ -154,11 +163,10 @@ export default function PartnerProfile({ partnerId, navigate }) {
           .or(`regional_partner_id.eq.${partnerId},submitted_by_partner_id.eq.${partnerId}`)
           .order("created_at", { ascending: false }),
         supabase
-          .from("payouts")
+          .from("partner_payouts")
           .select("*")
-          .eq("beneficiary_type", "partner")
-          .eq("beneficiary_id", partnerId)
-          .order("paid_on", { ascending: false }),
+          .eq("partner_id", partnerId)
+          .order("payout_date", { ascending: false }),
       ]);
       if (!promotorRes.error)   setPromotors(promotorRes.data || []);
       if (!subPartnerRes.error) setSubPartners(subPartnerRes.data || []);
@@ -227,6 +235,35 @@ export default function PartnerProfile({ partnerId, navigate }) {
     } else {
       alert("Failed to create login: " + (data.error || "Unknown error"));
     }
+  };
+
+  const loadPayouts = async () => {
+    if (!partnerId) return;
+    const { data } = await supabase
+      .from("partner_payouts")
+      .select("*")
+      .eq("partner_id", partnerId)
+      .order("payout_date", { ascending: false });
+    if (data) setPartnerPayouts(data);
+  };
+
+  const addPayout = async () => {
+    if (!payoutForm.amount || !payoutForm.payout_date) return;
+    setSavingPayout(true);
+    setPayoutError("");
+    const { error } = await supabase.from("partner_payouts").insert({
+      partner_id:     partnerId,
+      amount:         Number(payoutForm.amount),
+      currency:       payoutForm.currency,
+      payout_date:    payoutForm.payout_date,
+      payment_method: payoutForm.payment_method || null,
+      notes:          payoutForm.notes.trim() || null,
+    });
+    setSavingPayout(false);
+    if (error) { setPayoutError(error.message); return; }
+    setShowPayoutModal(false);
+    setPayoutForm({ amount: "", currency: "USD", payment_method: "Bank Transfer", payout_date: new Date().toISOString().slice(0, 10), notes: "" });
+    await loadPayouts();
   };
 
   // ── Computed values ───────────────────────────────────────────────
@@ -639,6 +676,8 @@ export default function PartnerProfile({ partnerId, navigate }) {
       {/* ── Earnings tab ───────────────────────────────────────────── */}
       {activeTab === "earnings" && (
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+
+          {/* Earnings summary cards */}
           {Object.keys(earningsByCurrency).length === 0 ? (
             <Card>
               <div style={{ fontSize: 13, fontWeight: 600, color: "#a0c8e8", letterSpacing: "0.08em", marginBottom: 14 }}>EARNINGS SUMMARY</div>
@@ -671,6 +710,16 @@ export default function PartnerProfile({ partnerId, navigate }) {
             );
           })}
 
+          {/* Record Payout button */}
+          <div style={{ display: "flex", justifyContent: "flex-end" }}>
+            <button
+              onClick={() => { setPayoutError(""); setShowPayoutModal(true); }}
+              style={{ padding: "9px 20px", borderRadius: 9, border: "1px solid rgba(90,176,240,0.4)", background: "rgba(90,176,240,0.12)", color: "#5ab0f0", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
+              + Record Payout
+            </button>
+          </div>
+
+          {/* Payout history */}
           <Card>
             <div style={{ fontSize: 13, fontWeight: 600, color: "#a0c8e8", letterSpacing: "0.08em", marginBottom: 14 }}>
               PAYOUT HISTORY
@@ -682,7 +731,7 @@ export default function PartnerProfile({ partnerId, navigate }) {
               <table style={{ width: "100%", borderCollapse: "collapse" }}>
                 <thead>
                   <tr style={{ borderBottom: "1px solid rgba(100,160,220,0.3)" }}>
-                    <TH>Amount</TH><TH>Currency</TH><TH>Paid On</TH><TH>Note</TH>
+                    <TH>Date</TH><TH>Amount</TH><TH>Method</TH><TH>Notes</TH>
                   </tr>
                 </thead>
                 <tbody>
@@ -692,10 +741,10 @@ export default function PartnerProfile({ partnerId, navigate }) {
                       onMouseEnter={e => e.currentTarget.style.background = "rgba(100,160,220,0.04)"}
                       onMouseLeave={e => e.currentTarget.style.background = "transparent"}
                     >
-                      <td style={{ padding: "10px 14px", fontSize: 14, fontWeight: 600, color: "#35c060" }}>{Number(p.amount).toLocaleString()}</td>
-                      <td style={{ padding: "10px 14px", fontSize: 13, color: "#7ab0cc" }}>{p.currency || "USD"}</td>
-                      <td style={{ padding: "10px 14px", fontSize: 13, color: "#7ab0cc", whiteSpace: "nowrap" }}>{fmtDate(p.paid_on)}</td>
-                      <td style={{ padding: "10px 14px", fontSize: 13, color: "#7ab0cc" }}>{p.note || "—"}</td>
+                      <td style={{ padding: "10px 14px", fontSize: 13, color: "#7ab0cc", whiteSpace: "nowrap" }}>{fmtDate(p.payout_date)}</td>
+                      <td style={{ padding: "10px 14px", fontSize: 14, fontWeight: 600, color: "#35c060", whiteSpace: "nowrap" }}>{p.currency || "USD"} {Number(p.amount).toFixed(2)}</td>
+                      <td style={{ padding: "10px 14px", fontSize: 13, color: "#a0c8e8" }}>{p.payment_method || "—"}</td>
+                      <td style={{ padding: "10px 14px", fontSize: 13, color: "#7ab0cc" }}>{p.notes || "—"}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -816,6 +865,100 @@ export default function PartnerProfile({ partnerId, navigate }) {
             </div>
           ))}
         </Card>
+      )}
+
+      {/* ── Record Payout Modal ─────────────────────────────────────── */}
+      {showPayoutModal && (
+        <div
+          onClick={e => { if (e.target === e.currentTarget) setShowPayoutModal(false); }}
+          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 200, padding: 24 }}>
+          <div style={{ background: "#0d1a35", border: "1px solid rgba(90,160,255,0.2)", borderRadius: 16, padding: "32px 36px", width: 460, boxShadow: "0 24px 80px rgba(0,0,0,0.6)" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
+              <h2 style={{ fontSize: 20, fontWeight: 700, color: "#ffffff", margin: 0 }}>Record Payout</h2>
+              <button onClick={() => setShowPayoutModal(false)} style={{ background: "none", border: "none", color: "#7ab0cc", fontSize: 22, cursor: "pointer", lineHeight: 1 }}>×</button>
+            </div>
+
+            {/* Partner name (read-only) */}
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ fontSize: 11, color: "#a0c8e8", fontWeight: 600, letterSpacing: "0.06em", display: "block", marginBottom: 5 }}>PARTNER</label>
+              <div style={{ padding: "10px 12px", borderRadius: 8, background: "rgba(8,16,36,0.8)", border: "1px solid rgba(100,160,220,0.2)", fontSize: 14, color: "#7ab0cc" }}>
+                {partner?.full_name || "—"}
+              </div>
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 16 }}>
+              <div>
+                <label style={{ fontSize: 11, color: "#a0c8e8", fontWeight: 600, letterSpacing: "0.06em", display: "block", marginBottom: 5 }}>AMOUNT *</label>
+                <input
+                  type="number" min="0" step="0.01" placeholder="0.00"
+                  value={payoutForm.amount}
+                  onChange={e => setPayoutForm(f => ({ ...f, amount: e.target.value }))}
+                  style={{ width: "100%", padding: "10px 12px", borderRadius: 8, fontSize: 14, border: "1.5px solid rgba(100,160,220,0.35)", background: "rgba(8,16,36,0.95)", color: "#ffffff", outline: "none", boxSizing: "border-box" }}
+                />
+              </div>
+              <div>
+                <label style={{ fontSize: 11, color: "#a0c8e8", fontWeight: 600, letterSpacing: "0.06em", display: "block", marginBottom: 5 }}>CURRENCY</label>
+                <select
+                  value={payoutForm.currency}
+                  onChange={e => setPayoutForm(f => ({ ...f, currency: e.target.value }))}
+                  style={{ width: "100%", padding: "10px 12px", borderRadius: 8, fontSize: 14, border: "1.5px solid rgba(100,160,220,0.35)", background: "rgba(8,16,36,0.95)", color: "#ffffff", outline: "none", cursor: "pointer", boxSizing: "border-box" }}>
+                  {["USD", "EUR", "GBP", "ETB", "SSP", "KES", "NGN"].map(c => <option key={c}>{c}</option>)}
+                </select>
+              </div>
+            </div>
+
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ fontSize: 11, color: "#a0c8e8", fontWeight: 600, letterSpacing: "0.06em", display: "block", marginBottom: 5 }}>PAYMENT METHOD</label>
+              <select
+                value={payoutForm.payment_method}
+                onChange={e => setPayoutForm(f => ({ ...f, payment_method: e.target.value }))}
+                style={{ width: "100%", padding: "10px 12px", borderRadius: 8, fontSize: 14, border: "1.5px solid rgba(100,160,220,0.35)", background: "rgba(8,16,36,0.95)", color: "#ffffff", outline: "none", cursor: "pointer", boxSizing: "border-box" }}>
+                <option>Cash</option>
+                <option>Bank Transfer</option>
+                <option>Mobile Money</option>
+                <option>Other</option>
+              </select>
+            </div>
+
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ fontSize: 11, color: "#a0c8e8", fontWeight: 600, letterSpacing: "0.06em", display: "block", marginBottom: 5 }}>DATE *</label>
+              <input
+                type="date"
+                value={payoutForm.payout_date}
+                onChange={e => setPayoutForm(f => ({ ...f, payout_date: e.target.value }))}
+                style={{ width: "100%", padding: "10px 12px", borderRadius: 8, fontSize: 14, border: "1.5px solid rgba(100,160,220,0.35)", background: "rgba(8,16,36,0.95)", color: "#ffffff", outline: "none", cursor: "pointer", boxSizing: "border-box", colorScheme: "dark" }}
+              />
+            </div>
+
+            <div style={{ marginBottom: 20 }}>
+              <label style={{ fontSize: 11, color: "#a0c8e8", fontWeight: 600, letterSpacing: "0.06em", display: "block", marginBottom: 5 }}>NOTES</label>
+              <textarea
+                rows={3}
+                placeholder="Optional notes..."
+                value={payoutForm.notes}
+                onChange={e => setPayoutForm(f => ({ ...f, notes: e.target.value }))}
+                style={{ width: "100%", padding: "10px 12px", borderRadius: 8, fontSize: 14, border: "1.5px solid rgba(100,160,220,0.35)", background: "rgba(8,16,36,0.95)", color: "#ffffff", outline: "none", resize: "vertical", fontFamily: "inherit", lineHeight: 1.5, boxSizing: "border-box" }}
+              />
+            </div>
+
+            {payoutError && (
+              <p style={{ color: "#f07070", fontSize: 13, margin: "0 0 14px", padding: "8px 12px", background: "rgba(220,80,80,0.1)", borderRadius: 7, border: "1px solid rgba(220,80,80,0.25)" }}>
+                {payoutError}
+              </p>
+            )}
+
+            <div style={{ display: "flex", gap: 10 }}>
+              <button onClick={() => setShowPayoutModal(false)}
+                style={{ flex: 1, padding: "11px 0", borderRadius: 9, border: "1px solid rgba(100,160,220,0.3)", background: "transparent", color: "#a0c8e8", fontSize: 15, cursor: "pointer" }}>
+                Cancel
+              </button>
+              <button onClick={addPayout} disabled={savingPayout || !payoutForm.amount || !payoutForm.payout_date}
+                style={{ flex: 2, padding: "11px 0", borderRadius: 9, border: "none", background: savingPayout || !payoutForm.amount || !payoutForm.payout_date ? "rgba(80,160,230,0.3)" : "linear-gradient(135deg, #3a9ad9, #2a7ab8)", color: "white", fontSize: 15, fontWeight: 700, cursor: savingPayout || !payoutForm.amount || !payoutForm.payout_date ? "default" : "pointer" }}>
+                {savingPayout ? "Saving..." : "Save"}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

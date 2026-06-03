@@ -30,6 +30,58 @@ const sectionLabel = {
   margin: 0,
 };
 
+// ── CSV helper ─────────────────────────────────────────────────────────────
+function downloadCSV(filename, headers, rows) {
+  const escape = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+  const lines = [headers.join(","), ...rows.map((r) => r.map(escape).join(","))];
+  const blob = new Blob([lines.join("\r\n")], { type: "text/csv;charset=utf-8;" });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement("a");
+  a.href     = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+// ── PDF helper — opens a formatted print window ────────────────────────────
+function printReport(title, sections) {
+  const ts = new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
+
+  const tableHtml = ({ heading, headers, rows }) => `
+    <h2>${heading}</h2>
+    <table>
+      <thead><tr>${headers.map((h) => `<th>${h}</th>`).join("")}</tr></thead>
+      <tbody>${rows.map((r) => `<tr>${r.map((c) => `<td>${c ?? "—"}</td>`).join("")}</tr>`).join("")}</tbody>
+    </table>`;
+
+  const html = `<!DOCTYPE html><html><head><title>${title}</title>
+  <style>
+    body { font-family: system-ui, -apple-system, sans-serif; font-size: 13px; color: #111; margin: 32px; }
+    h1   { font-size: 22px; font-weight: 800; margin: 0 0 4px; }
+    .sub { font-size: 13px; color: #666; margin: 0 0 28px; }
+    h2   { font-size: 13px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: #444; margin: 28px 0 8px; border-top: 1px solid #e5e7eb; padding-top: 16px; }
+    table { width: 100%; border-collapse: collapse; margin-bottom: 4px; }
+    th    { text-align: left; font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: #777; padding: 6px 10px; border-bottom: 1px solid #d1d5db; }
+    td    { padding: 8px 10px; border-bottom: 1px solid #f3f4f6; font-size: 13px; }
+    tr:last-child td { border-bottom: none; }
+    @media print { body { margin: 16px; } }
+  </style></head>
+  <body>
+    <h1>${title}</h1>
+    <p class="sub">Generated ${ts} · QR-Wegn Partner Network</p>
+    ${sections.map(tableHtml).join("")}
+  </body></html>`;
+
+  const win = window.open("", "_blank");
+  if (!win) { alert("Allow pop-ups to export PDF."); return; }
+  win.document.write(html);
+  win.document.close();
+  win.onload = () => { win.focus(); win.print(); };
+}
+
+// ── Component ──────────────────────────────────────────────────────────────
 export default function ReportsPage({ navigate }) {
   const [leads,     setLeads]     = useState([]);
   const [payouts,   setPayouts]   = useState([]);
@@ -52,7 +104,7 @@ export default function ReportsPage({ navigate }) {
     });
   }, []);
 
-  // ── Commission summary (same logic as AdminDashboard) ─────────────────
+  // ── Commission summary ────────────────────────────────────────────────────
   const commMap = {};
   const upsert = (key, init) => { if (!commMap[key]) commMap[key] = { ...init, owed: 0, paid: 0 }; };
 
@@ -90,12 +142,12 @@ export default function ReportsPage({ navigate }) {
     }
     commMap[key].paid += Number(p.amount);
   });
-  const commRows    = Object.values(commMap).sort((a, b) => a.name.localeCompare(b.name));
-  const totalOwed   = commRows.reduce((s, r) => s + r.owed, 0);
-  const totalPaid   = payouts.reduce((s, p) => s + Number(p.amount), 0);
-  const totalDue    = commRows.reduce((s, r) => s + Math.max(0, r.owed - r.paid), 0);
+  const commRows  = Object.values(commMap).sort((a, b) => a.name.localeCompare(b.name));
+  const totalOwed = commRows.reduce((s, r) => s + r.owed, 0);
+  const totalPaid = payouts.reduce((s, p) => s + Number(p.amount), 0);
+  const totalDue  = commRows.reduce((s, r) => s + Math.max(0, r.owed - r.paid), 0);
 
-  // ── Pipeline summary ──────────────────────────────────────────────────
+  // ── Pipeline summary ──────────────────────────────────────────────────────
   const stageCounts = STAGES.reduce((acc, s) => ({
     ...acc, [s]: leads.filter((l) => (l.status || "new") === s).length,
   }), {});
@@ -103,10 +155,116 @@ export default function ReportsPage({ navigate }) {
     .filter((l) => EARN.includes(l.status) && l.monthly_value)
     .reduce((s, l) => s + Number(l.monthly_value), 0);
 
-  const ExportBtn = ({ label }) => (
-    <button disabled
-      title="Export not yet available"
-      style={{ fontSize: 13, fontWeight: 600, padding: "8px 18px", borderRadius: 10, border: "1px solid #e5e7eb", background: "#f9fafb", color: "#9ca3af", cursor: "not-allowed" }}>
+  // ── Export handlers ───────────────────────────────────────────────────────
+
+  // Commission Summary CSV
+  const exportCommCSV = () => downloadCSV(
+    "commission-summary.csv",
+    ["Person", "Role", "Currency", "Owed", "Paid", "Balance", "Overpaid"],
+    commRows.map((r) => {
+      const bal  = Math.max(0, r.owed - r.paid);
+      const over = r.paid > r.owed ? r.paid - r.owed : 0;
+      return [r.name, r.role, r.currency, r.owed.toFixed(2), r.paid.toFixed(2), bal.toFixed(2), over.toFixed(2)];
+    })
+  );
+
+  // Payout History CSV
+  const exportPayoutsCSV = () => downloadCSV(
+    "payout-history.csv",
+    ["Date", "Beneficiary", "Role", "Amount", "Currency", "Note"],
+    payouts.map((p) => [fmtDate(p.paid_on), p.beneficiary || "", p.beneficiary_type || "", Number(p.amount).toFixed(2), p.currency || "USD", p.note || ""])
+  );
+
+  // Pipeline CSV
+  const exportPipelineCSV = () => downloadCSV(
+    "lead-pipeline.csv",
+    ["Stage", "Count", "% of Total", "MRR Contribution"],
+    STAGES.map((s) => {
+      const count = stageCounts[s] || 0;
+      const pct   = leads.length > 0 ? Math.round((count / leads.length) * 100) : 0;
+      const stageMrr = EARN.includes(s)
+        ? leads.filter((l) => l.status === s && l.monthly_value).reduce((sum, l) => sum + Number(l.monthly_value), 0)
+        : null;
+      return [s, count, `${pct}%`, stageMrr != null ? stageMrr.toFixed(2) : "—"];
+    })
+  );
+
+  // Full report CSV (all sections combined)
+  const exportAllCSV = () => {
+    const ts = new Date().toISOString().slice(0, 10);
+    const lines = [
+      // Commission section
+      "COMMISSION SUMMARY",
+      ["Person", "Role", "Currency", "Owed", "Paid", "Balance"].join(","),
+      ...commRows.map((r) => {
+        const bal = Math.max(0, r.owed - r.paid);
+        return [r.name, r.role, r.currency, r.owed.toFixed(2), r.paid.toFixed(2), bal.toFixed(2)].map((v) => `"${v}"`).join(",");
+      }),
+      "",
+      // Payouts section
+      "PAYOUT HISTORY",
+      ["Date", "Beneficiary", "Role", "Amount", "Currency", "Note"].join(","),
+      ...payouts.map((p) => [fmtDate(p.paid_on), p.beneficiary || "", p.beneficiary_type || "", Number(p.amount).toFixed(2), p.currency || "USD", p.note || ""].map((v) => `"${v}"`).join(",")),
+      "",
+      // Pipeline section
+      "LEAD PIPELINE",
+      ["Stage", "Count", "% of Total", "MRR Contribution"].join(","),
+      ...STAGES.map((s) => {
+        const count = stageCounts[s] || 0;
+        const pct   = leads.length > 0 ? Math.round((count / leads.length) * 100) : 0;
+        const stageMrr = EARN.includes(s)
+          ? leads.filter((l) => l.status === s && l.monthly_value).reduce((sum, l) => sum + Number(l.monthly_value), 0)
+          : null;
+        return [`"${s}"`, count, `"${pct}%"`, stageMrr != null ? stageMrr.toFixed(2) : `"—"`].join(",");
+      }),
+    ];
+    const blob = new Blob([lines.join("\r\n")], { type: "text/csv;charset=utf-8;" });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement("a");
+    a.href     = url;
+    a.download = `qrwegn-report-${ts}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  // Full report PDF
+  const exportAllPDF = () => printReport("QR-Wegn Partner Report", [
+    {
+      heading: "Commission Summary",
+      headers: ["Person", "Role", "Currency", "Owed", "Paid", "Balance"],
+      rows: commRows.map((r) => {
+        const bal = Math.max(0, r.owed - r.paid);
+        return [r.name, r.role, r.currency, `${r.currency} ${r.owed.toFixed(2)}`, `${r.currency} ${r.paid.toFixed(2)}`, `${r.currency} ${bal.toFixed(2)}`];
+      }),
+    },
+    {
+      heading: `Payout History (${payouts.length})`,
+      headers: ["Date", "Beneficiary", "Role", "Amount", "Note"],
+      rows: payouts.map((p) => [fmtDate(p.paid_on), p.beneficiary || "—", p.beneficiary_type || "—", `${p.currency || "USD"} ${Number(p.amount).toLocaleString()}`, p.note || "—"]),
+    },
+    {
+      heading: "Lead Pipeline Summary",
+      headers: ["Stage", "Count", "% of Total", "MRR Contribution"],
+      rows: STAGES.map((s) => {
+        const count = stageCounts[s] || 0;
+        const pct   = leads.length > 0 ? Math.round((count / leads.length) * 100) : 0;
+        const stageMrr = EARN.includes(s)
+          ? leads.filter((l) => l.status === s && l.monthly_value).reduce((sum, l) => sum + Number(l.monthly_value), 0)
+          : null;
+        return [s, count, `${pct}%`, stageMrr != null ? `$${stageMrr.toLocaleString()}` : "—"];
+      }),
+    },
+  ]);
+
+  // Reusable active export button
+  const ExportBtn = ({ label, onClick }) => (
+    <button
+      onClick={onClick}
+      style={{ fontSize: 13, fontWeight: 600, padding: "8px 18px", borderRadius: 10, border: `1px solid ${NAVY}`, background: "#fff", color: NAVY, cursor: "pointer", transition: "all 0.15s" }}
+      onMouseEnter={(e) => { e.currentTarget.style.background = NAVY; e.currentTarget.style.color = "#fff"; }}
+      onMouseLeave={(e) => { e.currentTarget.style.background = "#fff"; e.currentTarget.style.color = NAVY; }}>
       ↓ {label}
     </button>
   );
@@ -132,8 +290,8 @@ export default function ReportsPage({ navigate }) {
           <h1 style={{ fontSize: 22, fontWeight: 800, color: "#111827", margin: 0, letterSpacing: "-0.02em" }}>Reports</h1>
         </div>
         <div style={{ display: "flex", gap: 10 }}>
-          <ExportBtn label="Export PDF" />
-          <ExportBtn label="Export CSV" />
+          <ExportBtn label="Export PDF" onClick={exportAllPDF} />
+          <ExportBtn label="Export CSV" onClick={exportAllCSV} />
         </div>
       </div>
 
@@ -142,10 +300,10 @@ export default function ReportsPage({ navigate }) {
         {/* Summary row */}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 16 }}>
           {[
-            { label: "Total Commission Owed", value: `$${totalOwed.toFixed(2)}`,    accent: GOLD         },
-            { label: "Total Paid Out",         value: `$${totalPaid.toFixed(2)}`,    accent: "#16a34a"    },
-            { label: "Balance Due",            value: `$${totalDue.toFixed(2)}`,     accent: totalDue > 0 ? "#d97706" : "#16a34a" },
-            { label: "MRR (Signed + Active)",  value: `$${mrr.toLocaleString()}`,    accent: NAVY         },
+            { label: "Total Commission Owed", value: `$${totalOwed.toFixed(2)}`,  accent: GOLD      },
+            { label: "Total Paid Out",         value: `$${totalPaid.toFixed(2)}`,  accent: "#16a34a" },
+            { label: "Balance Due",            value: `$${totalDue.toFixed(2)}`,   accent: totalDue > 0 ? "#d97706" : "#16a34a" },
+            { label: "MRR (Signed + Active)",  value: `$${mrr.toLocaleString()}`,  accent: NAVY      },
           ].map((s) => (
             <div key={s.label} style={{ ...card, padding: "24px 22px", borderTop: `3px solid ${s.accent}` }}>
               <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "#374151", marginBottom: 12 }}>{s.label}</div>
@@ -158,7 +316,7 @@ export default function ReportsPage({ navigate }) {
         <div style={{ ...card, overflow: "hidden" }}>
           <div style={{ padding: "22px 28px 16px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <p style={sectionLabel}>Commission Summary</p>
-            <ExportBtn label="Export" />
+            <ExportBtn label="Export CSV" onClick={exportCommCSV} />
           </div>
           {commRows.length === 0 ? (
             <p style={{ padding: "24px 28px", fontSize: 15, color: "#374151" }}>No commission data yet. Commissions accrue when leads reach Signed or Active status.</p>
@@ -170,7 +328,7 @@ export default function ReportsPage({ navigate }) {
                 </tr>
               </thead>
               <tbody>
-                {commRows.map((r, i) => {
+                {commRows.map((r) => {
                   const bal  = Math.max(0, r.owed - r.paid);
                   const over = r.paid > r.owed ? r.paid - r.owed : 0;
                   return (
@@ -199,7 +357,7 @@ export default function ReportsPage({ navigate }) {
         <div style={{ ...card, overflow: "hidden" }}>
           <div style={{ padding: "22px 28px 16px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <p style={sectionLabel}>Payout History <span style={{ fontWeight: 400, textTransform: "none", letterSpacing: 0, color: "#374151" }}>({payouts.length})</span></p>
-            <ExportBtn label="Export" />
+            <ExportBtn label="Export CSV" onClick={exportPayoutsCSV} />
           </div>
           {payouts.length === 0 ? (
             <p style={{ padding: "24px 28px", fontSize: 15, color: "#374151" }}>No payouts recorded yet.</p>
@@ -233,7 +391,7 @@ export default function ReportsPage({ navigate }) {
         <div style={{ ...card, padding: "28px 32px" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
             <p style={sectionLabel}>Lead Pipeline Summary</p>
-            <ExportBtn label="Export" />
+            <ExportBtn label="Export CSV" onClick={exportPipelineCSV} />
           </div>
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead>

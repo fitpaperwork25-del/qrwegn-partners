@@ -7,16 +7,16 @@ const GOLD = "#E8C547";
 
 // ── Navigation ─────────────────────────────────────────────────────────────
 const NAV = [
-  { id: "dashboard",   label: "Dashboard",   icon: "⊞", target: null        },
-  { id: "leads",       label: "Leads",       icon: "◈", target: null        },
-  { id: "partners",    label: "Partners",    icon: "◇", target: "partners"  },
-  { id: "clients",     label: "Clients",     icon: "◉", target: null        },
-  { id: "commissions", label: "Commissions", icon: "◎", target: null        },
-  { id: "payouts",     label: "Payouts",     icon: "⊙", target: null        },
-  { id: "training",    label: "Training",    icon: "◎", target: "training"  },
-  { id: "analytics",   label: "Analytics",   icon: "▦", target: null        },
-  { id: "reports",     label: "Reports",     icon: "◧", target: null        },
-  { id: "resources",   label: "Resources",   icon: "◇", target: "materials" },
+  { id: "dashboard",   label: "Dashboard",   icon: "⊞", target: "dashboard"   },
+  { id: "leads",       label: "Leads",       icon: "◈", target: "leads"       },
+  { id: "partners",    label: "Partners",    icon: "◇", target: "partners"    },
+  { id: "clients",     label: "Clients",     icon: "◉", target: "clients"     },
+  { id: "commissions", label: "Commissions", icon: "◎", target: "commissions" },
+  { id: "payouts",     label: "Payouts",     icon: "⊙", target: "payouts"     },
+  { id: "training",    label: "Training",    icon: "◎", target: "training"    },
+  { id: "analytics",   label: "Analytics",   icon: "▦", target: "analytics"   },
+  { id: "reports",     label: "Reports",     icon: "◧", target: "reports"     },
+  { id: "resources",   label: "Resources",   icon: "◇", target: "materials"   },
 ];
 
 // ── Lead status — WCAG AA colours on their bg ──────────────────────────────
@@ -135,7 +135,7 @@ export default function LightDashboard({ navigate, onLogout, profile }) {
             return (
               <button
                 key={item.id}
-                onClick={() => item.target && navigate(item.target)}
+                onClick={() => navigate(item.target)}
                 style={{
                   width: "100%",
                   display: "flex",
@@ -291,7 +291,7 @@ export default function LightDashboard({ navigate, onLogout, profile }) {
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "28px 32px 20px" }}>
               <div style={sectionLabel}>Recent Leads</div>
               <button
-                onClick={() => navigate("dashboard")}
+                onClick={() => navigate("leads")}
                 style={{ fontSize: 15, fontWeight: 600, color: NAVY, background: "none", border: "none", cursor: "pointer", letterSpacing: "0.02em" }}>
                 View all →
               </button>
@@ -388,10 +388,10 @@ export default function LightDashboard({ navigate, onLogout, profile }) {
             <div style={sectionLabel}>Quick Actions</div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(6,1fr)", gap: 16 }}>
               {[
-                { label: "Add Lead",      icon: "＋",  action: () => navigate("partners"),  accent: NAVY       },
-                { label: "Add Partner",   icon: "◇",   action: () => navigate("partners"),  accent: NAVY       },
-                { label: "Record Payout", icon: "⊙",   action: () => navigate("partners"),  accent: GOLD       },
-                { label: "View Reports",  icon: "◧",   action: () => {},                     accent: "#2563eb"  },
+                { label: "Add Lead",      icon: "＋",  action: () => navigate("leads"),       accent: NAVY       },
+                { label: "Add Partner",   icon: "◇",   action: () => navigate("partners"),   accent: NAVY       },
+                { label: "Record Payout", icon: "⊙",   action: () => navigate("payouts"),    accent: GOLD       },
+                { label: "View Reports",  icon: "◧",   action: () => navigate("reports"),    accent: "#2563eb"  },
                 { label: "Training",      icon: "◎",   action: () => navigate("training"),   accent: "#7c3aed"  },
                 { label: "Demo Links",    icon: "◈",   action: () => navigate("materials"),  accent: "#0e7490"  },
               ].map((a) => (

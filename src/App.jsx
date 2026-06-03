@@ -9,7 +9,13 @@ import MaterialsPage from "./pages/MaterialsPage";
 import PartnerPortal from "./pages/PartnerPortal";
 import PromotorPortal from "./pages/PromotorPortal";
 import JoinPage from "./pages/JoinPage";
-import LightDashboard from "./pages/LightDashboard";
+import LightDashboard   from "./pages/LightDashboard";
+import LeadsPage        from "./pages/LeadsPage";
+import ClientsPage      from "./pages/ClientsPage";
+import CommissionsPage  from "./pages/CommissionsPage";
+import PayoutsPage      from "./pages/PayoutsPage";
+import AnalyticsPage    from "./pages/AnalyticsPage";
+import ReportsPage      from "./pages/ReportsPage";
 
 // Top-level router — no hooks here so the /join early-return is rules-of-hooks safe
 export default function App() {
@@ -90,10 +96,16 @@ function PortalApp() {
     // All other admin pages keep the existing dark AdminLayout
     return (
       <AdminLayout page={page} navigate={navigate} onLogout={logout} profile={profile}>
-        {page === "partners" && <PartnersPage navigate={navigate} />}
+        {page === "partners"    && <PartnersPage navigate={navigate} />}
         {page === "partner-profile" && <PartnerProfile partnerId={selectedPartnerId} navigate={navigate} />}
-        {page === "training" && <TrainingPage />}
-        {page === "materials" && <MaterialsPage />}
+        {page === "training"    && <TrainingPage />}
+        {page === "materials"   && <MaterialsPage />}
+        {page === "leads"       && <LeadsPage navigate={navigate} />}
+        {page === "clients"     && <ClientsPage />}
+        {page === "commissions" && <CommissionsPage />}
+        {page === "payouts"     && <PayoutsPage />}
+        {page === "analytics"   && <AnalyticsPage />}
+        {page === "reports"     && <ReportsPage />}
       </AdminLayout>
     );
   }
@@ -190,10 +202,16 @@ function ResetPasswordPage({ setPage }) {
 
 function AdminLayout({ children, page, navigate, onLogout, profile }) {
   const navItems = [
-    { id: "dashboard", label: "Dashboard", icon: "⊞" },
-    { id: "partners", label: "Partners", icon: "◈" },
-    { id: "training", label: "Training", icon: "◎" },
-    { id: "materials", label: "Materials", icon: "◇" },
+    { id: "dashboard",   label: "Dashboard",   icon: "⊞" },
+    { id: "leads",       label: "Leads",       icon: "◈" },
+    { id: "partners",    label: "Partners",    icon: "◇" },
+    { id: "clients",     label: "Clients",     icon: "◉" },
+    { id: "commissions", label: "Commissions", icon: "◎" },
+    { id: "payouts",     label: "Payouts",     icon: "⊙" },
+    { id: "training",    label: "Training",    icon: "◎" },
+    { id: "analytics",   label: "Analytics",   icon: "▦" },
+    { id: "reports",     label: "Reports",     icon: "◧" },
+    { id: "materials",   label: "Resources",   icon: "◇" },
   ];
 
   return (

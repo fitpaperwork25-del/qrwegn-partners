@@ -232,6 +232,8 @@ export default function PromotorPortal({ profile, onLogout }) {
       plan:           lead.plan,
       monthly_value:  PLAN_VALUES[lead.plan] ?? null,
       currency:       "USD",
+      promotor_pct:   10,
+      partner_pct:    20,
     });
     setLeadSaving(false);
     if (error) {

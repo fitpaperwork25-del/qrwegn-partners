@@ -7,28 +7,20 @@ const GOLD = "#E8C547";
 const EARN = ["signed", "active"];
 const STAGES = ["new", "contacted", "demo", "signed", "active", "churned"];
 
-// Readable date string for display
-const fmtDate = (iso) =>
-  !iso ? "" : new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-
-// Clean export value: null/undefined/"—" → "" so Excel cells are truly empty
-const clean = (v) => (v == null || v === "—") ? "" : String(v);
-
-// Readable date for export columns (never em-dash)
+const fmtDate    = (iso) => !iso ? "" : new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+const clean      = (v)   => (v == null || v === "—") ? "" : String(v);
 const exportDate = (iso) => !iso ? "" : new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 
 // ── Excel helper ───────────────────────────────────────────────────────────
-// sheets: [{ name, headers: string[], rows: (string|number)[][] }]
 function toXLSX(filename, sheets) {
   const wb = XLSX.utils.book_new();
   sheets.forEach(({ name, headers, rows }) => {
     const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
-    // Auto-width: set each column to the max content length
     const maxLens = headers.map((h, ci) =>
       Math.max(h.length, ...rows.map((r) => String(r[ci] ?? "").length))
     );
     ws["!cols"] = maxLens.map((w) => ({ wch: Math.min(w + 2, 50) }));
-    XLSX.utils.book_append_sheet(wb, ws, name.slice(0, 31)); // sheet name ≤ 31 chars
+    XLSX.utils.book_append_sheet(wb, ws, name.slice(0, 31));
   });
   XLSX.writeFile(wb, filename);
 }
@@ -47,14 +39,15 @@ function printReport(title, sections) {
     body { font-family: system-ui,-apple-system,sans-serif; font-size: 13px; color: #111; margin: 32px; }
     h1   { font-size: 22px; font-weight: 800; margin: 0 0 4px; }
     .sub { font-size: 13px; color: #666; margin: 0 0 28px; }
-    h2   { font-size: 13px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: #444; margin: 28px 0 8px; border-top: 1px solid #e5e7eb; padding-top: 16px; }
+    h2   { font-size: 13px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: #444;
+           margin: 28px 0 8px; border-top: 1px solid #e5e7eb; padding-top: 16px; }
     table { width: 100%; border-collapse: collapse; margin-bottom: 4px; }
-    th    { text-align: left; font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: #777; padding: 6px 10px; border-bottom: 1px solid #d1d5db; }
+    th    { text-align: left; font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+            color: #777; padding: 6px 10px; border-bottom: 1px solid #d1d5db; }
     td    { padding: 8px 10px; border-bottom: 1px solid #f3f4f6; font-size: 13px; }
     tr:last-child td { border-bottom: none; }
     @media print { body { margin: 16px; } }
-  </style></head>
-  <body>
+  </style></head><body>
     <h1>${title}</h1>
     <p class="sub">Generated ${ts} · QR-Wegn Partner Network</p>
     ${sections.map(tableHtml).join("")}
@@ -68,13 +61,12 @@ function printReport(title, sections) {
 
 // ── Shared styles ──────────────────────────────────────────────────────────
 const card = {
-  background: "#fff",
-  borderRadius: 20,
-  border: "1px solid #e5e7eb",
+  background: "#fff", borderRadius: 20, border: "1px solid #e5e7eb",
   boxShadow: "0 1px 4px rgba(0,0,0,0.04), 0 4px 16px rgba(0,0,0,0.04)",
 };
 const TH = ({ children }) => (
-  <th style={{ padding: "11px 20px", textAlign: "left", fontSize: 12, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#374151", whiteSpace: "nowrap" }}>
+  <th style={{ padding: "11px 20px", textAlign: "left", fontSize: 12, fontWeight: 700,
+               letterSpacing: "0.08em", textTransform: "uppercase", color: "#374151", whiteSpace: "nowrap" }}>
     {children}
   </th>
 );
@@ -86,24 +78,30 @@ export default function ReportsPage({ navigate }) {
   const [payouts,   setPayouts]   = useState([]);
   const [partners,  setPartners]  = useState([]);
   const [promotors, setPromotors] = useState([]);
+  const [commTxns,  setCommTxns]  = useState([]);
   const [loading,   setLoading]   = useState(true);
 
   useEffect(() => {
     Promise.all([
-      supabase.from("leads").select("id, status, monthly_value, currency, partner_pct, promotor_pct, submitted_by_promotor_id, regional_partner_id").order("created_at", { ascending: false }),
+      // Added business_name to leads select for commission_transactions drill-down
+      supabase.from("leads")
+        .select("id, business_name, status, monthly_value, currency, partner_pct, promotor_pct, submitted_by_promotor_id, regional_partner_id")
+        .order("created_at", { ascending: false }),
       supabase.from("payouts").select("*").order("paid_on", { ascending: false }),
       supabase.from("partners").select("id, full_name"),
       supabase.from("promotors").select("id, full_name"),
-    ]).then(([lRes, payRes, pRes, prRes]) => {
+      supabase.from("commission_transactions").select("*").order("created_at", { ascending: false }),
+    ]).then(([lRes, payRes, pRes, prRes, txRes]) => {
       if (!lRes.error)   setLeads(lRes.data    || []);
       if (!payRes.error) setPayouts(payRes.data || []);
       if (!pRes.error)   setPartners(pRes.data  || []);
       if (!prRes.error)  setPromotors(prRes.data || []);
+      if (!txRes.error)  setCommTxns(txRes.data  || []);
       setLoading(false);
     });
   }, []);
 
-  // ── Commission summary ────────────────────────────────────────────────────
+  // ── Commission summary (unchanged logic) ─────────────────────────────────
   const commMap = {};
   const upsert = (key, init) => { if (!commMap[key]) commMap[key] = { ...init, owed: 0, paid: 0 }; };
   promotors.forEach((pr) => {
@@ -126,8 +124,7 @@ export default function ReportsPage({ navigate }) {
   });
   payouts.forEach((p) => {
     if (!p.beneficiary_type || !p.beneficiary_id) return;
-    const cur = p.currency || "USD";
-    const key = `${p.beneficiary_type}:${p.beneficiary_id}:${cur}`;
+    const cur = p.currency || "USD"; const key = `${p.beneficiary_type}:${p.beneficiary_id}:${cur}`;
     if (!commMap[key]) {
       const all = [
         ...promotors.map((pr) => ({ type: "promotor", id: pr.id, name: pr.full_name, role: "Promotor" })),
@@ -147,56 +144,49 @@ export default function ReportsPage({ navigate }) {
   const stageCounts = STAGES.reduce((acc, s) => ({ ...acc, [s]: leads.filter((l) => (l.status || "new") === s).length }), {});
   const mrr = leads.filter((l) => EARN.includes(l.status) && l.monthly_value).reduce((s, l) => s + Number(l.monthly_value), 0);
 
-  // ── Prepared row sets (clean values, no em-dashes) ────────────────────────
+  // ── Build lead lookup map for commission transactions ─────────────────────
+  const leadMap = Object.fromEntries(leads.map((l) => [l.id, l.business_name || ""]));
+
+  // ── Prepared row sets ─────────────────────────────────────────────────────
   const commSheetRows = commRows.map((r) => {
-    const bal  = Math.max(0, r.owed - r.paid);
-    const over = r.paid > r.owed ? r.paid - r.owed : 0;
+    const bal = Math.max(0, r.owed - r.paid); const over = r.paid > r.owed ? r.paid - r.owed : 0;
     return [clean(r.name), clean(r.role), clean(r.currency), r.owed.toFixed(2), r.paid.toFixed(2), bal.toFixed(2), over > 0 ? over.toFixed(2) : ""];
   });
-
   const payoutSheetRows = payouts.map((p) => [
-    exportDate(p.paid_on),
-    clean(p.beneficiary),
-    clean(p.beneficiary_type),
-    Number(p.amount).toFixed(2),
-    clean(p.currency) || "USD",
-    clean(p.note),
+    exportDate(p.paid_on), clean(p.beneficiary), clean(p.beneficiary_type),
+    Number(p.amount).toFixed(2), clean(p.currency) || "USD", clean(p.note),
   ]);
-
   const pipelineSheetRows = STAGES.map((s) => {
-    const count    = stageCounts[s] || 0;
-    const pct      = leads.length > 0 ? Math.round((count / leads.length) * 100) : 0;
+    const count = stageCounts[s] || 0;
+    const pct   = leads.length > 0 ? Math.round((count / leads.length) * 100) : 0;
     const stageMrr = EARN.includes(s)
       ? leads.filter((l) => l.status === s && l.monthly_value).reduce((sum, l) => sum + Number(l.monthly_value), 0)
       : null;
     return [s, count, pct, stageMrr != null ? stageMrr.toFixed(2) : ""];
   });
+  const commTxnSheetRows = commTxns.map((tx) => [
+    clean(leadMap[tx.lead_id] || tx.lead_id),
+    exportDate(tx.period_start),
+    exportDate(tx.period_end),
+    tx.subscription_amount != null ? Number(tx.subscription_amount).toFixed(2) : "",
+    tx.partner_commission   != null ? Number(tx.partner_commission).toFixed(2)  : "",
+    tx.promotor_commission  != null ? Number(tx.promotor_commission).toFixed(2) : "",
+    clean(tx.status),
+  ]);
 
   // ── Export handlers ───────────────────────────────────────────────────────
-  const exportCommXLSX = () => toXLSX("commission-summary.xlsx", [{
-    name: "Commission Summary",
-    headers: ["Person", "Role", "Currency", "Owed", "Paid", "Balance", "Overpaid"],
-    rows: commSheetRows,
-  }]);
-
-  const exportPayoutsXLSX = () => toXLSX("payout-history.xlsx", [{
-    name: "Payout History",
-    headers: ["Date", "Beneficiary", "Role", "Amount", "Currency", "Note"],
-    rows: payoutSheetRows,
-  }]);
-
-  const exportPipelineXLSX = () => toXLSX("lead-pipeline.xlsx", [{
-    name: "Lead Pipeline",
-    headers: ["Stage", "Count", "% of Total", "MRR Contribution"],
-    rows: pipelineSheetRows,
-  }]);
+  const exportCommXLSX     = () => toXLSX("commission-summary.xlsx",    [{ name: "Commission Summary", headers: ["Person", "Role", "Currency", "Owed", "Paid", "Balance", "Overpaid"],                                                                             rows: commSheetRows    }]);
+  const exportPayoutsXLSX  = () => toXLSX("payout-history.xlsx",        [{ name: "Payout History",     headers: ["Date", "Beneficiary", "Role", "Amount", "Currency", "Note"],                                                                                     rows: payoutSheetRows  }]);
+  const exportPipelineXLSX = () => toXLSX("lead-pipeline.xlsx",         [{ name: "Lead Pipeline",      headers: ["Stage", "Count", "% of Total", "MRR Contribution"],                                                                                              rows: pipelineSheetRows}]);
+  const exportCommTxnsXLSX = () => toXLSX("commission-transactions.xlsx",[{ name: "Comm Transactions", headers: ["Business", "Period Start", "Period End", "Subscription Amount", "Partner Commission", "Promotor Commission", "Status"],                         rows: commTxnSheetRows }]);
 
   const exportAllXLSX = () => {
     const ts = new Date().toISOString().slice(0, 10);
     toXLSX(`qrwegn-report-${ts}.xlsx`, [
-      { name: "Commission Summary", headers: ["Person", "Role", "Currency", "Owed", "Paid", "Balance", "Overpaid"], rows: commSheetRows },
-      { name: "Payout History",     headers: ["Date", "Beneficiary", "Role", "Amount", "Currency", "Note"],         rows: payoutSheetRows },
-      { name: "Lead Pipeline",      headers: ["Stage", "Count", "% of Total", "MRR Contribution"],                  rows: pipelineSheetRows },
+      { name: "Commission Summary",  headers: ["Person", "Role", "Currency", "Owed", "Paid", "Balance", "Overpaid"],                                                                           rows: commSheetRows     },
+      { name: "Payout History",      headers: ["Date", "Beneficiary", "Role", "Amount", "Currency", "Note"],                                                                                   rows: payoutSheetRows   },
+      { name: "Lead Pipeline",       headers: ["Stage", "Count", "% of Total", "MRR Contribution"],                                                                                            rows: pipelineSheetRows },
+      { name: "Comm Transactions",   headers: ["Business", "Period Start", "Period End", "Subscription Amount", "Partner Commission", "Promotor Commission", "Status"],                       rows: commTxnSheetRows  },
     ]);
   };
 
@@ -216,18 +206,30 @@ export default function ReportsPage({ navigate }) {
       headers: ["Stage", "Count", "% of Total", "MRR Contribution"],
       rows: pipelineSheetRows.map(([s, c, pct, m]) => [s, c, `${pct}%`, m ? `$${parseFloat(m).toLocaleString()}` : ""]),
     },
+    {
+      heading: `Commission Transactions (${commTxns.length})`,
+      headers: ["Business", "Period Start", "Period End", "Subscription", "Partner Comm", "Promotor Comm", "Status"],
+      rows: commTxnSheetRows,
+    },
   ]);
 
-  // ── Export button (active) ─────────────────────────────────────────────────
-  const ExportBtn = ({ label, onClick, icon = "↓" }) => (
-    <button
-      onClick={onClick}
+  // ── Export button ──────────────────────────────────────────────────────────
+  const ExportBtn = ({ label, onClick, icon = "📊" }) => (
+    <button onClick={onClick}
       style={{ fontSize: 13, fontWeight: 600, padding: "8px 18px", borderRadius: 10, border: `1px solid ${NAVY}`, background: "#fff", color: NAVY, cursor: "pointer", transition: "all 0.15s", display: "flex", alignItems: "center", gap: 6 }}
       onMouseEnter={(e) => { e.currentTarget.style.background = NAVY; e.currentTarget.style.color = "#fff"; }}
       onMouseLeave={(e) => { e.currentTarget.style.background = "#fff"; e.currentTarget.style.color = NAVY; }}>
       <span>{icon}</span> {label}
     </button>
   );
+
+  // ── Status badge colour ────────────────────────────────────────────────────
+  const txStatusStyle = (status) => {
+    if (status === "paid")   return { color: "#15803d", bg: "#dcfce7" };
+    if (status === "owed")   return { color: "#b45309", bg: "#fef3c7" };
+    if (status === "void")   return { color: "#6b7280", bg: "#f3f4f6" };
+    return                          { color: "#2563eb", bg: "#dbeafe" };
+  };
 
   if (loading) {
     return (
@@ -272,11 +274,78 @@ export default function ReportsPage({ navigate }) {
           ))}
         </div>
 
+        {/* Commission transactions drill-down */}
+        <div style={{ ...card, overflow: "hidden" }}>
+          <div style={{ padding: "22px 28px 16px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div>
+              <p style={sectionLabel}>Commission Transactions</p>
+              {commTxns.length > 0 && (
+                <p style={{ fontSize: 13, color: "#374151", margin: "4px 0 0", fontWeight: 400 }}>
+                  {commTxns.length} transaction{commTxns.length !== 1 ? "s" : ""} ·{" "}
+                  USD {commTxns.reduce((s, t) => s + Number(t.partner_commission || 0), 0).toFixed(2)} partner total
+                </p>
+              )}
+            </div>
+            <ExportBtn label="Export Excel" onClick={exportCommTxnsXLSX} />
+          </div>
+          {commTxns.length === 0 ? (
+            <p style={{ padding: "24px 28px", fontSize: 15, color: "#374151" }}>
+              No commission transactions yet. Transactions are created when leads are signed or activated.
+            </p>
+          ) : (
+            <div style={{ overflowX: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                <thead>
+                  <tr style={{ borderTop: "1px solid #f3f4f6" }}>
+                    <TH>Business</TH>
+                    <TH>Period Start</TH>
+                    <TH>Period End</TH>
+                    <TH>Subscription</TH>
+                    <TH>Partner Comm</TH>
+                    <TH>Promotor Comm</TH>
+                    <TH>Status</TH>
+                  </tr>
+                </thead>
+                <tbody>
+                  {commTxns.map((tx) => {
+                    const biz = leadMap[tx.lead_id] || "—";
+                    const sc  = txStatusStyle(tx.status);
+                    return (
+                      <tr key={tx.id} style={{ borderTop: "1px solid #f3f4f6" }}
+                        onMouseEnter={(e) => e.currentTarget.style.background = "#fafafa"}
+                        onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}>
+                        <td style={{ padding: "14px 20px", fontSize: 15, fontWeight: 600, color: "#111827", whiteSpace: "nowrap" }}>{biz}</td>
+                        <td style={{ padding: "14px 20px", fontSize: 14, color: "#374151", whiteSpace: "nowrap" }}>{fmtDate(tx.period_start)}</td>
+                        <td style={{ padding: "14px 20px", fontSize: 14, color: "#374151", whiteSpace: "nowrap" }}>{fmtDate(tx.period_end)}</td>
+                        <td style={{ padding: "14px 20px", fontSize: 14, fontWeight: 600, color: "#111827", whiteSpace: "nowrap" }}>
+                          {tx.subscription_amount != null ? `USD ${Number(tx.subscription_amount).toFixed(2)}` : "—"}
+                        </td>
+                        <td style={{ padding: "14px 20px", fontSize: 14, fontWeight: 700, color: "#15803d", whiteSpace: "nowrap" }}>
+                          {tx.partner_commission != null ? `USD ${Number(tx.partner_commission).toFixed(2)}` : "—"}
+                        </td>
+                        <td style={{ padding: "14px 20px", fontSize: 14, color: "#374151", whiteSpace: "nowrap" }}>
+                          {tx.promotor_commission != null ? `USD ${Number(tx.promotor_commission).toFixed(2)}` : "—"}
+                        </td>
+                        <td style={{ padding: "14px 20px" }}>
+                          <span style={{ fontSize: 12, fontWeight: 700, padding: "4px 12px", borderRadius: 99, letterSpacing: "0.06em", textTransform: "uppercase", background: sc.bg, color: sc.color }}>
+                            {tx.status || "—"}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+          <div style={{ height: 4 }} />
+        </div>
+
         {/* Commission summary */}
         <div style={{ ...card, overflow: "hidden" }}>
           <div style={{ padding: "22px 28px 16px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <p style={sectionLabel}>Commission Summary</p>
-            <ExportBtn label="Export Excel" onClick={exportCommXLSX} icon="📊" />
+            <ExportBtn label="Export Excel" onClick={exportCommXLSX} />
           </div>
           {commRows.length === 0 ? (
             <p style={{ padding: "24px 28px", fontSize: 15, color: "#374151" }}>No commission data yet. Commissions accrue when leads reach Signed or Active status.</p>
@@ -285,8 +354,7 @@ export default function ReportsPage({ navigate }) {
               <thead><tr style={{ borderTop: "1px solid #f3f4f6" }}><TH>Person</TH><TH>Role</TH><TH>Currency</TH><TH>Owed</TH><TH>Paid</TH><TH>Balance</TH></tr></thead>
               <tbody>
                 {commRows.map((r) => {
-                  const bal  = Math.max(0, r.owed - r.paid);
-                  const over = r.paid > r.owed ? r.paid - r.owed : 0;
+                  const bal = Math.max(0, r.owed - r.paid); const over = r.paid > r.owed ? r.paid - r.owed : 0;
                   return (
                     <tr key={`${r.role}:${r.name}:${r.currency}`} style={{ borderTop: "1px solid #f3f4f6" }}
                       onMouseEnter={(e) => e.currentTarget.style.background = "#fafafa"}
@@ -312,7 +380,7 @@ export default function ReportsPage({ navigate }) {
         <div style={{ ...card, overflow: "hidden" }}>
           <div style={{ padding: "22px 28px 16px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <p style={sectionLabel}>Payout History <span style={{ fontWeight: 400, textTransform: "none", letterSpacing: 0, color: "#374151" }}>({payouts.length})</span></p>
-            <ExportBtn label="Export Excel" onClick={exportPayoutsXLSX} icon="📊" />
+            <ExportBtn label="Export Excel" onClick={exportPayoutsXLSX} />
           </div>
           {payouts.length === 0 ? (
             <p style={{ padding: "24px 28px", fontSize: 15, color: "#374151" }}>No payouts recorded yet.</p>
@@ -341,7 +409,7 @@ export default function ReportsPage({ navigate }) {
         <div style={{ ...card, padding: "28px 32px" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
             <p style={sectionLabel}>Lead Pipeline Summary</p>
-            <ExportBtn label="Export Excel" onClick={exportPipelineXLSX} icon="📊" />
+            <ExportBtn label="Export Excel" onClick={exportPipelineXLSX} />
           </div>
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead>
@@ -353,8 +421,8 @@ export default function ReportsPage({ navigate }) {
             </thead>
             <tbody>
               {STAGES.map((s) => {
-                const count    = stageCounts[s] || 0;
-                const pct      = leads.length > 0 ? Math.round((count / leads.length) * 100) : 0;
+                const count = stageCounts[s] || 0;
+                const pct   = leads.length > 0 ? Math.round((count / leads.length) * 100) : 0;
                 const stageMrr = EARN.includes(s)
                   ? leads.filter((l) => l.status === s && l.monthly_value).reduce((sum, l) => sum + Number(l.monthly_value), 0)
                   : null;

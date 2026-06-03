@@ -9,6 +9,7 @@ import MaterialsPage from "./pages/MaterialsPage";
 import PartnerPortal from "./pages/PartnerPortal";
 import PromotorPortal from "./pages/PromotorPortal";
 import JoinPage from "./pages/JoinPage";
+import LightDashboard from "./pages/LightDashboard";
 
 // Top-level router — no hooks here so the /join early-return is rules-of-hooks safe
 export default function App() {
@@ -82,9 +83,13 @@ function PortalApp() {
   }
 
   if (role === "admin") {
+    // New light-mode dashboard — rendered outside AdminLayout (has its own sidebar/header)
+    if (page === "dashboard") {
+      return <LightDashboard navigate={navigate} onLogout={logout} profile={profile} />;
+    }
+    // All other admin pages keep the existing dark AdminLayout
     return (
       <AdminLayout page={page} navigate={navigate} onLogout={logout} profile={profile}>
-        {page === "dashboard" && <AdminDashboard navigate={navigate} />}
         {page === "partners" && <PartnersPage navigate={navigate} />}
         {page === "partner-profile" && <PartnerProfile partnerId={selectedPartnerId} navigate={navigate} />}
         {page === "training" && <TrainingPage />}

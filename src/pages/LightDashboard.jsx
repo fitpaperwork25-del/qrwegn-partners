@@ -89,7 +89,8 @@ export default function LightDashboard({ navigate, onLogout, profile }) {
   const mrr         = earnLeads.filter((l) => l.monthly_value).reduce((s, l) => s + Number(l.monthly_value), 0);
   const activeCount = leads.filter((l) => l.status === "active").length;
   const signedCount = leads.filter((l) => l.status === "signed").length;
-  const pipelineVal = leads.filter((l) => l.status !== "churned" && l.monthly_value).reduce((s, l) => s + Number(l.monthly_value), 0);
+  // Pipeline value = pre-close leads only (excludes signed, active, churned)
+  const pipelineVal = leads.filter((l) => !["signed", "active", "churned"].includes(l.status) && l.monthly_value).reduce((s, l) => s + Number(l.monthly_value), 0);
   const commsDue    = earnLeads.filter((l) => l.monthly_value && l.partner_pct).reduce((s, l) => s + l.monthly_value * l.partner_pct / 100, 0);
   const convRate    = leads.length > 0 ? Math.round(((signedCount + activeCount) / leads.length) * 100) : 0;
 
@@ -229,9 +230,9 @@ export default function LightDashboard({ navigate, onLogout, profile }) {
                 accent: GOLD,
               },
               {
-                label: "Active Clients",
-                value: String(activeCount),
-                sub:   `${signedCount} signed · ${leads.length} total`,
+                label: "Signed Clients",
+                value: String(signedCount + activeCount),
+                sub:   `${signedCount} signed · ${activeCount} live`,
                 accent: "#16a34a",
               },
               {
@@ -243,7 +244,7 @@ export default function LightDashboard({ navigate, onLogout, profile }) {
               {
                 label: "Pipeline Value",
                 value: usd(pipelineVal),
-                sub:   `${leads.filter((l) => l.status !== "churned").length} open leads`,
+                sub:   `${leads.filter((l) => !["signed","active","churned"].includes(l.status)).length} pre-close leads`,
                 accent: "#2563eb",
               },
             ].map((kpi) => (
@@ -268,7 +269,7 @@ export default function LightDashboard({ navigate, onLogout, profile }) {
           <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 20, marginBottom: 32 }}>
             {[
               { label: "Total Leads",     value: String(leads.length),        sub: "in pipeline",                  color: "#111827" },
-              { label: "Signed Clients",  value: String(signedCount + activeCount), sub: `${signedCount} signed · ${activeCount} active`, color: "#15803d" },
+              { label: "Signed Clients",  value: String(signedCount + activeCount), sub: `${signedCount} signed · ${activeCount} live`,   color: "#15803d" },
               { label: "Conversion Rate", value: `${convRate}%`,              sub: "signed + active / total leads", color: "#111827" },
             ].map((stat) => (
               <div key={stat.label} style={{ ...card, padding: "28px 32px" }}>

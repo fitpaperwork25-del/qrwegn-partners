@@ -145,7 +145,7 @@ export default function ReportsPage({ navigate }) {
             { label: "Total Commission Owed", value: `$${totalOwed.toFixed(2)}`,    accent: GOLD         },
             { label: "Total Paid Out",         value: `$${totalPaid.toFixed(2)}`,    accent: "#16a34a"    },
             { label: "Balance Due",            value: `$${totalDue.toFixed(2)}`,     accent: totalDue > 0 ? "#d97706" : "#16a34a" },
-            { label: "Pipeline MRR",           value: `$${mrr.toLocaleString()}`,    accent: NAVY         },
+            { label: "MRR (Signed + Active)",  value: `$${mrr.toLocaleString()}`,    accent: NAVY         },
           ].map((s) => (
             <div key={s.label} style={{ ...card, padding: "24px 22px", borderTop: `3px solid ${s.accent}` }}>
               <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "#374151", marginBottom: 12 }}>{s.label}</div>

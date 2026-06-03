@@ -44,7 +44,7 @@ export default function ClientsPage() {
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 14, marginBottom: 24 }}>
         {[
           { label: "Total Clients",  value: clients.length,                                     color: "#ffffff" },
-          { label: "Active",         value: clients.filter((c) => c.status === "active").length, color: "#35c060" },
+          { label: "Live / Active",  value: clients.filter((c) => c.status === "active").length, color: "#35c060" },
           { label: "Monthly Revenue",value: `$${mrr.toLocaleString()}`,                          color: "#e8c547" },
         ].map((s) => (
           <Card key={s.label} style={{ padding: "20px 24px" }}>

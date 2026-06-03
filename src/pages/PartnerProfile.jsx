@@ -80,6 +80,8 @@ export default function PartnerProfile({ partnerId, navigate }) {
   const [dataLoading,      setDataLoading]      = useState(false);
   const [linkCopied,       setLinkCopied]       = useState(false);
   const [approvingId,      setApprovingId]      = useState(null);
+  const [loginCreating,    setLoginCreating]    = useState(null);
+  const [loginStatus,      setLoginStatus]      = useState({});
 
   // ── Loaders ──────────────────────────────────────────────────────
 
@@ -136,31 +138,48 @@ export default function PartnerProfile({ partnerId, navigate }) {
       });
   }, []);
 
-  // Load promotors, sub-partners, leads, and payouts in parallel
+  // Load promotors, sub-partners, leads, payouts, and existing login status
   useEffect(() => {
     if (!partnerId) return;
     setDataLoading(true);
-    Promise.all([
-      supabase.from("promotors").select("*").eq("partner_id", partnerId).order("full_name"),
-      supabase.from("partners").select("*").eq("parent_partner_id", partnerId).order("full_name"),
-      supabase
-        .from("leads")
-        .select("*, submitted_by_partner:partners!leads_submitted_by_partner_id_fkey(full_name)")
-        .or(`regional_partner_id.eq.${partnerId},submitted_by_partner_id.eq.${partnerId}`)
-        .order("created_at", { ascending: false }),
-      supabase
-        .from("payouts")
-        .select("*")
-        .eq("beneficiary_type", "partner")
-        .eq("beneficiary_id", partnerId)
-        .order("paid_on", { ascending: false }),
-    ]).then(([promotorRes, subPartnerRes, leadRes, payoutRes]) => {
+    const load = async () => {
+      const [promotorRes, subPartnerRes, leadRes, payoutRes] = await Promise.all([
+        supabase.from("promotors").select("*").eq("partner_id", partnerId).order("full_name"),
+        supabase.from("partners").select("*").eq("parent_partner_id", partnerId).order("full_name"),
+        supabase
+          .from("leads")
+          .select("*, submitted_by_partner:partners!leads_submitted_by_partner_id_fkey(full_name)")
+          .or(`regional_partner_id.eq.${partnerId},submitted_by_partner_id.eq.${partnerId}`)
+          .order("created_at", { ascending: false }),
+        supabase
+          .from("payouts")
+          .select("*")
+          .eq("beneficiary_type", "partner")
+          .eq("beneficiary_id", partnerId)
+          .order("paid_on", { ascending: false }),
+      ]);
       if (!promotorRes.error)   setPromotors(promotorRes.data || []);
       if (!subPartnerRes.error) setSubPartners(subPartnerRes.data || []);
       if (!leadRes.error)       setLeads(leadRes.data || []);
       if (!payoutRes.error)     setPartnerPayouts(payoutRes.data || []);
+
+      // Pre-check which promotors already have a login profile
+      const pIds = (promotorRes.data || []).map(p => p.id).filter(Boolean);
+      if (pIds.length > 0) {
+        const { data: existingProfiles } = await supabase
+          .from("profiles")
+          .select("promotor_id")
+          .in("promotor_id", pIds);
+        const statusMap = {};
+        (existingProfiles || []).forEach(row => {
+          if (row.promotor_id) statusMap[row.promotor_id] = "exists";
+        });
+        setLoginStatus(statusMap);
+      }
+
       setDataLoading(false);
-    });
+    };
+    load();
   }, [partnerId]);
 
   const handleSaveInteraction = async () => {
@@ -183,6 +202,28 @@ export default function PartnerProfile({ partnerId, navigate }) {
       setPromotors(prev => prev.map(p => p.id === promotorId ? { ...p, status: newStatus } : p));
     }
     setApprovingId(null);
+  };
+
+  const handleCreateLogin = async (pr) => {
+    setLoginCreating(pr.id);
+    const { data: { session } } = await supabase.auth.getSession();
+    const res = await fetch("/api/create-promotor-login", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${session?.access_token}`,
+      },
+      body: JSON.stringify({ promotorId: pr.id, email: pr.email, fullName: pr.full_name }),
+    });
+    const data = await res.json();
+    setLoginCreating(null);
+    if (res.status === 409) {
+      setLoginStatus(prev => ({ ...prev, [pr.id]: "exists" }));
+    } else if (res.ok) {
+      setLoginStatus(prev => ({ ...prev, [pr.id]: "done" }));
+    } else {
+      alert("Failed to create login: " + (data.error || "Unknown error"));
+    }
   };
 
   // ── Computed values ───────────────────────────────────────────────
@@ -480,6 +521,26 @@ export default function PartnerProfile({ partnerId, navigate }) {
                               </button>
                             </div>
                           )}
+                          {!pr.isSubPartner && pr.status === "active" && (() => {
+                            const ls = loginStatus[pr.id];
+                            if (ls === "done") return (
+                              <span style={{ fontSize: 12, fontWeight: 600, color: "#35c060" }}>Login Active ✓</span>
+                            );
+                            if (ls === "exists") return (
+                              <span style={{ fontSize: 12, color: "#7ab0cc" }}>Login Already Created</span>
+                            );
+                            if (!pr.email) return (
+                              <span style={{ fontSize: 12, color: "#5a7a90", fontStyle: "italic" }}>No email on file</span>
+                            );
+                            return (
+                              <button
+                                onClick={e => { e.stopPropagation(); handleCreateLogin(pr); }}
+                                disabled={loginCreating === pr.id}
+                                style={{ padding: "4px 12px", borderRadius: 7, border: "1px solid rgba(100,160,220,0.4)", background: "rgba(100,160,220,0.12)", color: "#5ab0f0", fontSize: 12, fontWeight: 700, cursor: loginCreating === pr.id ? "default" : "pointer", whiteSpace: "nowrap" }}>
+                                {loginCreating === pr.id ? "…" : "Create Login"}
+                              </button>
+                            );
+                          })()}
                         </td>
                       </tr>
                     );

@@ -1,6 +1,11 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabase";
 
+// ── Brand tokens ───────────────────────────────────────────────────────────
+const NAVY   = "#0B1739";
+const GOLD   = "#E8C547";
+const GRAY   = "#F8FAFC";
+
 // ── Nav ────────────────────────────────────────────────────────────────────
 const NAV = [
   { id: "dashboard",   label: "Dashboard",   icon: "⊞", target: null        },
@@ -15,54 +20,47 @@ const NAV = [
   { id: "resources",   label: "Resources",   icon: "◇", target: "materials" },
 ];
 
-// ── Stage colours (Tailwind) ───────────────────────────────────────────────
+// ── Lead stage config ─────────────────────────────────────────────────────
 const SC = {
-  new:       { text: "text-blue-600",   bg: "bg-blue-50",    bar: "bg-blue-400"   },
-  contacted: { text: "text-cyan-600",   bg: "bg-cyan-50",    bar: "bg-cyan-400"   },
-  demo:      { text: "text-violet-600", bg: "bg-violet-50",  bar: "bg-violet-400" },
-  signed:    { text: "text-amber-600",  bg: "bg-amber-50",   bar: "bg-amber-400"  },
-  active:    { text: "text-green-600",  bg: "bg-green-50",   bar: "bg-green-400"  },
-  churned:   { text: "text-gray-400",   bg: "bg-gray-100",   bar: "bg-gray-300"   },
+  new:       { text: "text-blue-600",   bg: "bg-blue-50",   bar: "bg-blue-400"   },
+  contacted: { text: "text-cyan-600",   bg: "bg-cyan-50",   bar: "bg-cyan-400"   },
+  demo:      { text: "text-purple-600", bg: "bg-purple-50", bar: "bg-purple-400" },
+  signed:    { text: "text-amber-600",  bg: "bg-amber-50",  bar: "bg-amber-400"  },
+  active:    { text: "text-green-600",  bg: "bg-green-50",  bar: "bg-green-400"  },
+  churned:   { text: "text-gray-400",   bg: "bg-gray-100",  bar: "bg-gray-300"   },
 };
 const STAGES = ["new", "contacted", "demo", "signed", "active", "churned"];
 const EARN   = ["signed", "active"];
 
 // ── Helpers ────────────────────────────────────────────────────────────────
-const usd = (n) => n >= 1000 ? `$${(n / 1000).toFixed(1)}k` : `$${n.toFixed(0)}`;
-const fmtD = (iso) => {
-  if (!iso) return "—";
-  return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric" });
-};
-const initials = (name = "") =>
-  name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase() || "?";
+const usd  = (n) => n >= 1000 ? `$${(n / 1000).toFixed(1)}k` : `$${n.toFixed(0)}`;
+const fmtD = (iso) => !iso ? "—" : new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+const inits = (name = "") => name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase() || "?";
 
-// ── Reusable card wrapper ──────────────────────────────────────────────────
+// ── Card shell ────────────────────────────────────────────────────────────
 const Card = ({ children, className = "" }) => (
-  <div className={`bg-white rounded-2xl shadow-sm border border-gray-100 p-5 ${className}`}>
+  <div className={`bg-white rounded-2xl border border-gray-100 shadow-sm ${className}`}>
     {children}
   </div>
 );
 
-const CardTitle = ({ children, right }) => (
-  <div className="flex items-center justify-between mb-4">
-    <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider">{children}</h3>
-    {right && <span className="text-xs text-violet-500 font-medium">{right}</span>}
-  </div>
+const SectionLabel = ({ children }) => (
+  <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-5">{children}</p>
 );
 
-// ── Component ──────────────────────────────────────────────────────────────
+// ── Component ─────────────────────────────────────────────────────────────
 export default function LightDashboard({ navigate, onLogout, profile }) {
   const [partners,  setPartners]  = useState([]);
   const [leads,     setLeads]     = useState([]);
   const [promotors, setPromotors] = useState([]);
   const [loading,   setLoading]   = useState(true);
 
-  const hour     = new Date().getHours();
-  const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
+  const hour      = new Date().getHours();
+  const greeting  = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
   const firstName = profile?.full_name?.split(" ")[0] || "there";
-  const today    = new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
+  const today     = new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
 
-  // ── Same queries as AdminDashboard — no logic changed ──────────────────
+  // ── Data — same queries as AdminDashboard, untouched ──────────────────
   useEffect(() => {
     (async () => {
       const [pRes, lRes, prRes] = await Promise.all([
@@ -80,18 +78,18 @@ export default function LightDashboard({ navigate, onLogout, profile }) {
     })();
   }, []);
 
-  // ── KPIs ───────────────────────────────────────────────────────────────
-  const earnLeads    = leads.filter((l) => EARN.includes(l.status));
-  const mrr          = earnLeads.filter((l) => l.monthly_value).reduce((s, l) => s + Number(l.monthly_value), 0);
-  const activeCount  = leads.filter((l) => l.status === "active").length;
-  const pipelineVal  = leads.filter((l) => l.status !== "churned" && l.monthly_value).reduce((s, l) => s + Number(l.monthly_value), 0);
-  const commsDue     = earnLeads.filter((l) => l.monthly_value && l.partner_pct).reduce((s, l) => s + l.monthly_value * l.partner_pct / 100, 0);
+  // ── Derived metrics ────────────────────────────────────────────────────
+  const earnLeads   = leads.filter((l) => EARN.includes(l.status));
+  const mrr         = earnLeads.filter((l) => l.monthly_value).reduce((s, l) => s + Number(l.monthly_value), 0);
+  const activeCount = leads.filter((l) => l.status === "active").length;
+  const signedCount = leads.filter((l) => l.status === "signed").length;
+  const pipelineVal = leads.filter((l) => l.status !== "churned" && l.monthly_value).reduce((s, l) => s + Number(l.monthly_value), 0);
+  const commsDue    = earnLeads.filter((l) => l.monthly_value && l.partner_pct).reduce((s, l) => s + l.monthly_value * l.partner_pct / 100, 0);
+  const convRate    = leads.length > 0 ? Math.round(((signedCount + activeCount) / leads.length) * 100) : 0;
 
-  // ── Pipeline counts ────────────────────────────────────────────────────
   const stageCounts = STAGES.reduce((acc, s) => ({ ...acc, [s]: leads.filter((l) => (l.status || "new") === s).length }), {});
   const maxCount    = Math.max(...Object.values(stageCounts), 1);
 
-  // ── Promotor commissions ────────────────────────────────────────────────
   const topPromotors = promotors
     .map((pr) => {
       const owed = leads
@@ -103,156 +101,222 @@ export default function LightDashboard({ navigate, onLogout, profile }) {
     .sort((a, b) => b.owed - a.owed)
     .slice(0, 5);
 
-  const recentLeads = leads.slice(0, 6);
+  const recentLeads = leads.slice(0, 8);
 
   if (loading) {
     return (
-      <div className="flex h-screen items-center justify-center bg-gray-50">
-        <div className="text-gray-400 text-sm animate-pulse">Loading dashboard…</div>
+      <div className="flex h-screen items-center justify-center" style={{ background: GRAY }}>
+        <div className="text-sm text-gray-400 animate-pulse">Loading…</div>
       </div>
     );
   }
 
   return (
-    <div className="flex h-screen bg-gray-50 overflow-hidden" style={{ fontFamily: "system-ui, -apple-system, sans-serif" }}>
+    <div className="flex h-screen overflow-hidden" style={{ background: GRAY, fontFamily: "system-ui,-apple-system,sans-serif" }}>
 
-      {/* ── Sidebar ───────────────────────────────────────────────────── */}
-      <aside className="w-56 bg-white border-r border-gray-100 flex flex-col flex-shrink-0 shadow-sm">
+      {/* ── Sidebar ──────────────────────────────────────────────────── */}
+      <aside className="w-56 flex flex-col flex-shrink-0" style={{ background: NAVY }}>
+
         {/* Logo */}
-        <div className="px-5 pt-5 pb-4 border-b border-gray-100">
-          <img src="/Logo.png" alt="QR-Wegn" style={{ height: 28 }} />
-          <div className="text-xs text-gray-300 mt-1.5 font-semibold tracking-widest">PARTNER NETWORK</div>
+        <div className="px-5 pt-6 pb-5" style={{ borderBottom: "1px solid rgba(255,255,255,0.07)" }}>
+          <img src="/Logo.png" alt="QR-Wegn" style={{ height: 26 }} />
+          <div className="mt-2 text-xs font-semibold tracking-widest" style={{ color: "rgba(255,255,255,0.25)" }}>
+            PARTNER NETWORK
+          </div>
         </div>
 
-        {/* Nav items */}
-        <nav className="flex-1 px-3 py-3 overflow-y-auto">
+        {/* Nav */}
+        <nav className="flex-1 px-2 py-4 overflow-y-auto">
           {NAV.map((item) => {
             const active = item.id === "dashboard";
             return (
               <button
                 key={item.id}
                 onClick={() => item.target && navigate(item.target)}
-                className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl mb-0.5 text-sm font-medium transition-all ${
-                  active
-                    ? "bg-violet-50 text-violet-700"
-                    : "text-gray-400 hover:bg-gray-50 hover:text-gray-700 cursor-pointer"
-                }`}
+                style={active
+                  ? { background: `${GOLD}18`, color: GOLD, borderLeft: `2px solid ${GOLD}` }
+                  : { color: "rgba(255,255,255,0.45)", borderLeft: "2px solid transparent" }
+                }
+                className="w-full flex items-center gap-2.5 pl-3 pr-3 py-2.5 text-sm font-medium mb-0.5 transition-all hover:text-white"
               >
-                <span className="text-base w-4 text-center">{item.icon}</span>
+                <span className="w-4 text-center text-base">{item.icon}</span>
                 {item.label}
               </button>
             );
           })}
         </nav>
 
-        {/* User card */}
-        <div className="p-3 mx-3 mb-4 rounded-xl bg-gray-50 border border-gray-100">
+        {/* User */}
+        <div className="mx-3 mb-4 p-3 rounded-xl" style={{ background: "rgba(255,255,255,0.05)" }}>
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-full bg-violet-100 flex items-center justify-center text-violet-700 text-xs font-bold flex-shrink-0">
-              {initials(profile?.full_name)}
+            <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0"
+              style={{ background: `${GOLD}22`, color: GOLD }}>
+              {inits(profile?.full_name)}
             </div>
             <div className="min-w-0 flex-1">
-              <div className="text-sm font-semibold text-gray-800 truncate">{profile?.full_name || "Admin"}</div>
-              <div className="text-xs text-gray-400">Admin</div>
+              <div className="text-sm font-semibold truncate text-white">{profile?.full_name || "Admin"}</div>
+              <div className="text-xs" style={{ color: "rgba(255,255,255,0.35)" }}>Admin</div>
             </div>
-            <button onClick={onLogout} title="Sign out" className="text-gray-300 hover:text-gray-500 text-sm flex-shrink-0">
+            <button onClick={onLogout} title="Sign out" className="text-xs transition-colors"
+              style={{ color: "rgba(255,255,255,0.3)" }}
+              onMouseEnter={(e) => e.currentTarget.style.color = "rgba(255,255,255,0.7)"}
+              onMouseLeave={(e) => e.currentTarget.style.color = "rgba(255,255,255,0.3)"}>
               ↩
             </button>
           </div>
         </div>
       </aside>
 
-      {/* ── Main content ──────────────────────────────────────────────── */}
+      {/* ── Main ─────────────────────────────────────────────────────── */}
       <main className="flex-1 overflow-y-auto">
-        <div className="max-w-6xl mx-auto px-6 py-6 space-y-5">
+        <div className="max-w-5xl mx-auto px-8 py-8 space-y-8">
 
           {/* Header */}
-          <div className="flex items-start justify-between">
+          <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">{greeting}, {firstName} 👋</h1>
-              <p className="text-sm text-gray-400 mt-0.5">Here's what's happening in your network today.</p>
+              <h1 className="text-2xl font-bold text-gray-900 tracking-tight">
+                {greeting}, {firstName} 👋
+              </h1>
+              <p className="text-sm text-gray-400 mt-1">
+                Here's what's happening in your network today.
+              </p>
             </div>
             <div className="flex items-center gap-3">
-              <div className="text-sm text-gray-500 bg-white border border-gray-100 rounded-xl px-3 py-2 shadow-sm">
-                📅 {today}
-              </div>
+              <span className="text-sm text-gray-400 bg-white border border-gray-100 rounded-xl px-3 py-2 shadow-sm">
+                {today}
+              </span>
               <button
                 onClick={() => navigate("partners")}
-                className="bg-violet-600 hover:bg-violet-700 text-white text-sm font-semibold px-4 py-2 rounded-xl shadow-sm transition-colors"
+                className="text-sm font-semibold px-5 py-2.5 rounded-xl shadow-sm transition-all text-white"
+                style={{ background: NAVY }}
+                onMouseEnter={(e) => e.currentTarget.style.opacity = "0.85"}
+                onMouseLeave={(e) => e.currentTarget.style.opacity = "1"}
               >
                 + Add Lead
               </button>
             </div>
           </div>
 
-          {/* KPI row */}
-          <div className="grid grid-cols-4 gap-4">
+          {/* ── KPI row ─────────────────────────────────────────────── */}
+          <div className="grid grid-cols-4 gap-5">
             {[
               {
                 label: "Monthly Recurring Revenue",
                 value: usd(mrr),
                 sub:   `${earnLeads.length} earning leads`,
-                color: "text-violet-600",
-                ring:  "bg-violet-50",
-                icon:  "💰",
+                accent: GOLD,
               },
               {
                 label: "Active Clients",
                 value: String(activeCount),
-                sub:   `of ${leads.length} total`,
-                color: "text-green-600",
-                ring:  "bg-green-50",
-                icon:  "✓",
-              },
-              {
-                label: "Pipeline Value",
-                value: usd(pipelineVal),
-                sub:   `${leads.filter((l) => l.status !== "churned").length} open`,
-                color: "text-blue-600",
-                ring:  "bg-blue-50",
-                icon:  "◈",
+                sub:   `${signedCount} signed · ${leads.length} total`,
+                accent: "#22c55e",
               },
               {
                 label: "Commissions Due",
                 value: usd(commsDue),
-                sub:   `${partners.length} partners`,
-                color: "text-amber-600",
-                ring:  "bg-amber-50",
-                icon:  "◎",
+                sub:   `across ${partners.length} partners`,
+                accent: GOLD,
+              },
+              {
+                label: "Pipeline Value",
+                value: usd(pipelineVal),
+                sub:   `${leads.filter((l) => l.status !== "churned").length} open leads`,
+                accent: "#3b82f6",
               },
             ].map((kpi) => (
-              <Card key={kpi.label}>
-                <div className="flex items-start justify-between">
-                  <div className={`w-9 h-9 rounded-xl ${kpi.ring} flex items-center justify-center text-base mb-3`}>
-                    {kpi.icon}
-                  </div>
+              <div key={kpi.label}
+                className="bg-white rounded-2xl border border-gray-100 shadow-sm p-7"
+                style={{ borderTop: `3px solid ${kpi.accent}` }}>
+                <div className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-4">
+                  {kpi.label}
                 </div>
-                <div className={`text-2xl font-bold ${kpi.color} leading-none mb-1`}>{kpi.value}</div>
-                <div className="text-xs text-gray-400 mt-1">{kpi.label}</div>
-                <div className="text-xs text-gray-300 mt-0.5">{kpi.sub}</div>
-              </Card>
+                <div className="text-4xl font-bold text-gray-900 leading-none mb-2">
+                  {kpi.value}
+                </div>
+                <div className="text-sm text-gray-400">{kpi.sub}</div>
+              </div>
             ))}
           </div>
 
-          {/* Mid row */}
-          <div className="grid grid-cols-3 gap-4">
+          {/* ── Recent Leads (full width) ────────────────────────────── */}
+          <Card>
+            <div className="px-7 pt-6 pb-2 flex items-center justify-between">
+              <SectionLabel>Recent Leads</SectionLabel>
+              <button className="text-xs font-semibold mb-5 transition-colors"
+                style={{ color: NAVY }}
+                onClick={() => navigate("dashboard")}>
+                View all →
+              </button>
+            </div>
+
+            {recentLeads.length === 0 ? (
+              <p className="text-sm text-gray-300 text-center pb-8">No leads yet.</p>
+            ) : (
+              <table className="w-full border-collapse">
+                <thead>
+                  <tr style={{ borderBottom: "1px solid #f1f5f9" }}>
+                    {["Business", "Contact", "Country", "Status", "Plan", "Monthly", "Date"].map((h) => (
+                      <th key={h} className="px-7 pb-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                        {h}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {recentLeads.map((l) => {
+                    const c = SC[l.status] || SC.new;
+                    return (
+                      <tr key={l.id}
+                        className="transition-colors"
+                        style={{ borderBottom: "1px solid #f8fafc" }}
+                        onMouseEnter={(e) => e.currentTarget.style.background = "#fafafa"}
+                        onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}>
+                        <td className="px-7 py-4 text-sm font-semibold text-gray-800 max-w-xs truncate">
+                          {l.business_name}
+                        </td>
+                        <td className="px-7 py-4 text-sm text-gray-500 max-w-xs truncate">
+                          {l.contact_name || "—"}
+                        </td>
+                        <td className="px-7 py-4 text-sm text-gray-400">{l.country || "—"}</td>
+                        <td className="px-7 py-4">
+                          <span className={`inline-block text-xs font-semibold px-2.5 py-1 rounded-full ${c.bg} ${c.text}`}>
+                            {l.status || "new"}
+                          </span>
+                        </td>
+                        <td className="px-7 py-4 text-sm text-gray-400">{l.plan || "—"}</td>
+                        <td className="px-7 py-4 text-sm font-semibold text-gray-700">
+                          {l.monthly_value != null ? `${l.currency || "USD"} ${Number(l.monthly_value).toFixed(0)}` : "—"}
+                        </td>
+                        <td className="px-7 py-4 text-sm text-gray-400">{fmtD(l.created_at)}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            )}
+            <div className="pb-2" />
+          </Card>
+
+          {/* ── Mid row: Pipeline + Network Stats ─────────────────────── */}
+          <div className="grid grid-cols-2 gap-5">
 
             {/* Sales Pipeline */}
-            <Card>
-              <CardTitle right={`${leads.length} leads`}>Sales Pipeline</CardTitle>
-              <div className="space-y-3">
+            <Card className="p-7">
+              <SectionLabel>Sales Pipeline</SectionLabel>
+              <div className="space-y-4">
                 {STAGES.map((s) => {
                   const c     = SC[s] || SC.new;
                   const count = stageCounts[s] || 0;
                   const pct   = (count / maxCount) * 100;
                   return (
                     <div key={s}>
-                      <div className="flex justify-between text-xs mb-1">
+                      <div className="flex justify-between text-sm mb-1.5">
                         <span className={`font-medium capitalize ${c.text}`}>{s}</span>
-                        <span className="text-gray-400">{count}</span>
+                        <span className="text-gray-400 font-medium">{count}</span>
                       </div>
                       <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                        <div className={`h-full rounded-full ${c.bar} transition-all`} style={{ width: `${pct}%` }} />
+                        <div className={`h-full rounded-full ${c.bar}`} style={{ width: `${pct}%`, transition: "width .3s" }} />
                       </div>
                     </div>
                   );
@@ -260,160 +324,72 @@ export default function LightDashboard({ navigate, onLogout, profile }) {
               </div>
             </Card>
 
-            {/* Network Map */}
-            <Card>
-              <CardTitle>Network Map</CardTitle>
-              <div className="space-y-2.5 mb-4">
+            {/* Network Stats — replaces Network Map */}
+            <Card className="p-7">
+              <SectionLabel>Network Overview</SectionLabel>
+              <div className="grid grid-cols-3 gap-4 mb-6">
                 {[
-                  { label: "Partners",  val: partners.length,  dot: "bg-violet-400" },
-                  { label: "Promotors", val: promotors.length, dot: "bg-blue-400"   },
-                  { label: "Leads",     val: leads.length,     dot: "bg-green-400"  },
-                  { label: "Active",    val: activeCount,      dot: "bg-amber-400"  },
-                ].map((r) => (
-                  <div key={r.label} className="flex items-center gap-3">
-                    <div className={`w-2 h-2 rounded-full flex-shrink-0 ${r.dot}`} />
-                    <span className="text-sm text-gray-500 flex-1">{r.label}</span>
-                    <span className="text-sm font-bold text-gray-800">{r.val}</span>
+                  { label: "Total Leads",     value: leads.length,        color: "text-gray-900" },
+                  { label: "Signed Clients",  value: signedCount + activeCount, color: "text-green-600" },
+                  { label: "Conversion Rate", value: `${convRate}%`,      color: "text-gray-900", accent: GOLD },
+                ].map((s) => (
+                  <div key={s.label}
+                    className="bg-gray-50 rounded-xl p-4"
+                    style={s.accent ? { borderTop: `2px solid ${s.accent}` } : {}}>
+                    <div className="text-xs text-gray-400 mb-2 leading-tight">{s.label}</div>
+                    <div className={`text-3xl font-bold leading-none ${s.color}`}>{s.value}</div>
                   </div>
                 ))}
               </div>
-              <div className="border-t border-gray-100 pt-3">
-                <div className="text-xs text-gray-400 mb-2 font-medium">PARTNER STAGES</div>
-                {["Active", "Onboarding", "Interested", "Identified", "Evaluating"].map((stage) => {
-                  const count = partners.filter((p) => p.stage === stage).length;
-                  if (count === 0) return null;
-                  return (
-                    <div key={stage} className="flex justify-between text-xs py-0.5">
-                      <span className="text-gray-500">{stage}</span>
-                      <span className="font-semibold text-gray-700">{count}</span>
-                    </div>
-                  );
-                })}
-                {partners.length === 0 && <p className="text-xs text-gray-300">No partners yet</p>}
-              </div>
-            </Card>
 
-            {/* Recent Activity */}
-            <Card>
-              <CardTitle>Recent Activity</CardTitle>
-              <div className="space-y-3">
-                {recentLeads.slice(0, 5).map((l) => {
-                  const c = SC[l.status] || SC.new;
-                  return (
-                    <div key={l.id} className="flex items-start gap-2.5">
-                      <div className={`w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0 ${c.bar}`} />
-                      <div className="min-w-0">
-                        <div className="text-sm font-medium text-gray-700 truncate">{l.business_name}</div>
-                        <div className="text-xs text-gray-400">{fmtD(l.created_at)} · <span className={c.text}>{l.status || "new"}</span></div>
-                      </div>
-                    </div>
-                  );
-                })}
-                {recentLeads.length === 0 && <p className="text-xs text-gray-300 text-center py-4">No recent activity</p>}
-              </div>
-            </Card>
-          </div>
-
-          {/* Bottom row */}
-          <div className="grid grid-cols-2 gap-4">
-
-            {/* Recent Leads */}
-            <Card>
-              <CardTitle right="View all →">Recent Leads</CardTitle>
-              <div className="space-y-1">
-                {recentLeads.length === 0 && <p className="text-xs text-gray-300 text-center py-6">No leads yet</p>}
-                {recentLeads.map((l) => {
-                  const c = SC[l.status] || SC.new;
-                  return (
-                    <div key={l.id} className="flex items-center gap-3 py-2 border-b border-gray-50 last:border-0">
-                      <div className="min-w-0 flex-1">
-                        <div className="text-sm font-semibold text-gray-800 truncate">{l.business_name}</div>
-                        <div className="text-xs text-gray-400 truncate">
-                          {l.contact_name || l.country || "—"} · {fmtD(l.created_at)}
-                        </div>
-                      </div>
-                      <span className={`text-xs font-semibold px-2 py-0.5 rounded-full flex-shrink-0 ${c.bg} ${c.text}`}>
-                        {l.status || "new"}
-                      </span>
-                      {l.monthly_value != null && (
-                        <span className="text-xs font-bold text-gray-600 flex-shrink-0">
-                          {l.currency || "USD"} {Number(l.monthly_value).toFixed(0)}
-                        </span>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </Card>
-
-            {/* Commissions + Earnings stacked */}
-            <div className="flex flex-col gap-4">
-
-              {/* Commissions Overview */}
-              <Card className="flex-1">
-                <CardTitle>Commissions Overview</CardTitle>
+              {/* Commissions preview */}
+              <div style={{ borderTop: "1px solid #f1f5f9" }} className="pt-5">
+                <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">
+                  Top Promotors
+                </p>
                 {topPromotors.length === 0 ? (
-                  <p className="text-xs text-gray-300 text-center py-3">No commissions yet</p>
-                ) : (
-                  <div className="space-y-2.5">
-                    {topPromotors.map((pr) => (
-                      <div key={pr.id} className="flex items-center gap-3">
-                        <div className="w-6 h-6 rounded-full bg-violet-100 flex items-center justify-center text-violet-700 text-xs font-bold flex-shrink-0">
-                          {(pr.full_name || "?")[0]}
-                        </div>
-                        <span className="text-sm text-gray-700 flex-1 truncate">{pr.full_name}</span>
-                        <span className="text-sm font-bold text-amber-600">USD {pr.owed.toFixed(2)}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </Card>
-
-              {/* Earnings Overview */}
-              <Card className="flex-1">
-                <CardTitle>Earnings Overview</CardTitle>
-                <div className="grid grid-cols-2 gap-2.5">
-                  {[
-                    { label: "Total MRR",   value: usd(mrr),          color: "text-violet-600" },
-                    { label: "Comms Due",   value: usd(commsDue),     color: "text-amber-600"  },
-                    { label: "Pipeline",    value: usd(pipelineVal),  color: "text-blue-600"   },
-                    { label: "Partners",    value: partners.length,   color: "text-green-600"  },
-                  ].map((s) => (
-                    <div key={s.label} className="bg-gray-50 rounded-xl p-3">
-                      <div className="text-xs text-gray-400 mb-1">{s.label}</div>
-                      <div className={`text-lg font-bold ${s.color}`}>{s.value}</div>
+                  <p className="text-sm text-gray-300">No commissions yet.</p>
+                ) : topPromotors.map((pr) => (
+                  <div key={pr.id} className="flex items-center gap-3 py-1.5">
+                    <div className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0"
+                      style={{ background: `${GOLD}22`, color: NAVY }}>
+                      {(pr.full_name || "?")[0]}
                     </div>
-                  ))}
-                </div>
-              </Card>
-            </div>
+                    <span className="text-sm text-gray-700 flex-1 truncate">{pr.full_name}</span>
+                    <span className="text-sm font-bold" style={{ color: NAVY }}>
+                      USD {pr.owed.toFixed(2)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </Card>
           </div>
 
-          {/* Quick Links */}
-          <Card>
-            <CardTitle>Quick Links</CardTitle>
+          {/* ── Quick Links (icon-only) ───────────────────────────────── */}
+          <div>
+            <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">Quick Actions</p>
             <div className="grid grid-cols-6 gap-3">
               {[
-                { label: "Add Lead",      icon: "◈", action: () => navigate("partners")  },
-                { label: "Add Partner",   icon: "◇", action: () => navigate("partners")  },
-                { label: "Record Payout", icon: "⊙", action: () => navigate("partners")  },
-                { label: "View Reports",  icon: "◧", action: () => {}                    },
-                { label: "Training",      icon: "◎", action: () => navigate("training")  },
-                { label: "Demo Links",    icon: "◈", action: () => navigate("materials") },
+                { label: "Add Lead",      icon: "＋", action: () => navigate("partners")  },
+                { label: "Add Partner",   icon: "◇",  action: () => navigate("partners")  },
+                { label: "Record Payout", icon: "⊙",  action: () => navigate("partners")  },
+                { label: "Reports",       icon: "◧",  action: () => {}                    },
+                { label: "Training",      icon: "◎",  action: () => navigate("training")  },
+                { label: "Demo Links",    icon: "◈",  action: () => navigate("materials") },
               ].map((link) => (
                 <button
                   key={link.label}
                   onClick={link.action}
-                  className="flex flex-col items-center gap-2 p-3 rounded-xl border border-gray-100 hover:border-violet-200 hover:bg-violet-50 transition-all group"
+                  className="bg-white border border-gray-100 rounded-2xl py-5 flex flex-col items-center gap-2.5 shadow-sm transition-all group"
+                  onMouseEnter={(e) => { e.currentTarget.style.borderColor = GOLD; e.currentTarget.style.background = `${GOLD}0a`; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.borderColor = "#f3f4f6"; e.currentTarget.style.background = "#fff"; }}
                 >
-                  <span className="text-xl group-hover:scale-110 transition-transform">{link.icon}</span>
-                  <span className="text-xs font-medium text-gray-500 group-hover:text-violet-700 text-center leading-tight">
-                    {link.label}
-                  </span>
+                  <span className="text-2xl leading-none">{link.icon}</span>
+                  <span className="text-xs font-medium text-gray-400 text-center leading-tight">{link.label}</span>
                 </button>
               ))}
             </div>
-          </Card>
+          </div>
 
         </div>
       </main>

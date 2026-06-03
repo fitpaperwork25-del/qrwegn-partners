@@ -593,6 +593,8 @@ export default function PartnerProfile({ partnerId, navigate }) {
                     <TH>Status</TH>
                     <TH>Plan</TH>
                     <TH>Monthly Value</TH>
+                    <TH>Promotor Comm</TH>
+                    <TH>Partner Comm</TH>
                     <TH>Submitted By</TH>
                     <TH>Follow-up</TH>
                   </tr>
@@ -612,6 +614,16 @@ export default function PartnerProfile({ partnerId, navigate }) {
                       <td style={{ padding: "12px 14px", fontSize: 13, color: "#a0c8e8" }}>{l.plan || "—"}</td>
                       <td style={{ padding: "12px 14px", fontSize: 13, fontWeight: l.monthly_value ? 600 : 400, color: l.monthly_value ? "#e8c547" : "#5a7a90", whiteSpace: "nowrap" }}>
                         {l.monthly_value != null ? `${l.currency || "USD"} ${Number(l.monthly_value).toLocaleString()}` : "—"}
+                      </td>
+                      <td style={{ padding: "12px 14px", fontSize: 13, color: "#a0c8e8", whiteSpace: "nowrap" }}>
+                        {l.monthly_value != null && l.promotor_pct != null
+                          ? `${l.currency || "USD"} ${(l.monthly_value * l.promotor_pct / 100).toFixed(2)}`
+                          : "—"}
+                      </td>
+                      <td style={{ padding: "12px 14px", fontSize: 13, color: "#a0c8e8", whiteSpace: "nowrap" }}>
+                        {l.monthly_value != null && l.partner_pct != null
+                          ? `${l.currency || "USD"} ${(l.monthly_value * l.partner_pct / 100).toFixed(2)}`
+                          : "—"}
                       </td>
                       <td style={{ padding: "12px 14px", fontSize: 13, color: "#5ab0f0", whiteSpace: "nowrap" }}>{submittedByName(l)}</td>
                       <td style={{ padding: "12px 14px", fontSize: 13, color: "#7ab0cc", whiteSpace: "nowrap" }}>{fmtDate(l.follow_up_date)}</td>

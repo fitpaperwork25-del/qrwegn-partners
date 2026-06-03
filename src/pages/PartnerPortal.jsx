@@ -226,6 +226,7 @@ export default function PartnerPortal({ profile, onLogout }) {
   const [myLeads, setMyLeads] = useState([]);
   const [myPayouts, setMyPayouts] = useState([]);
   const [demoLinks, setDemoLinks] = useState([]);
+  const [partnerId, setPartnerId] = useState(null);
 
   useEffect(() => {
     loadAll();
@@ -233,11 +234,25 @@ export default function PartnerPortal({ profile, onLogout }) {
 
   const loadAll = async () => {
     setLoading(true);
+
+    // Resolve this partner's partner_id from profiles before loading any scoped data
+    const { data: { user } } = await supabase.auth.getUser();
+    let pid = null;
+    if (user) {
+      const { data: profileRow } = await supabase
+        .from("profiles")
+        .select("partner_id")
+        .eq("id", user.id)
+        .single();
+      pid = profileRow?.partner_id ?? null;
+      setPartnerId(pid);
+    }
+
     await Promise.all([
       loadChecklist(),
-      loadPromotors(),
-      loadMyLeads(),
-      loadMyPayouts(),
+      loadPromotors(pid),
+      loadMyLeads(pid),
+      loadMyPayouts(pid),
       loadDemoLinks(),
       loadTraining(),
       loadMaterials(),
@@ -326,21 +341,26 @@ export default function PartnerPortal({ profile, onLogout }) {
     }
   };
 
-  const loadMyLeads = async () => {
+  const loadMyLeads = async (pid) => {
+    const id = pid ?? partnerId;
+    if (!id) { setMyLeads([]); return; }
     const { data, error } = await supabase
       .from("leads")
       .select("*")
+      .or(`regional_partner_id.eq.${id},submitted_by_partner_id.eq.${id}`)
       .order("created_at", { ascending: false });
-
     if (!error) setMyLeads(data || []);
   };
 
-  const loadMyPayouts = async () => {
+  const loadMyPayouts = async (pid) => {
+    const id = pid ?? partnerId;
+    if (!id) { setMyPayouts([]); return; }
     const { data, error } = await supabase
       .from("payouts")
       .select("*")
+      .eq("beneficiary_type", "partner")
+      .eq("beneficiary_id", id)
       .order("paid_on", { ascending: false });
-
     if (!error) setMyPayouts(data || []);
   };
 
@@ -353,12 +373,14 @@ export default function PartnerPortal({ profile, onLogout }) {
     if (!error) setDemoLinks(data || []);
   };
 
-  const loadPromotors = async () => {
+  const loadPromotors = async (pid) => {
+    const id = pid ?? partnerId;
+    if (!id) { setPromotors([]); return; }
     const { data, error } = await supabase
       .from("promotors")
       .select("*")
+      .eq("partner_id", id)
       .order("created_at", { ascending: false });
-
     if (!error) setPromotors(data || []);
   };
 

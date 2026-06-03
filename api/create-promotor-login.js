@@ -5,7 +5,7 @@ const supabaseAdmin = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
-const ADMIN_EMAIL = "fitpaperwork25@gmail.com";
+const ADMIN_EMAIL = "info@qrwegn.com";
 
 export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).end();

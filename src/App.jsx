@@ -89,9 +89,15 @@ function PortalApp() {
   }
 
   if (role === "admin") {
-    // New light-mode dashboard — rendered outside AdminLayout (has its own sidebar/header)
+    // Light-mode pages — rendered outside AdminLayout (own layout/style)
     if (page === "dashboard") {
       return <LightDashboard navigate={navigate} onLogout={logout} profile={profile} />;
+    }
+    if (page === "analytics") {
+      return <AnalyticsPage navigate={navigate} />;
+    }
+    if (page === "reports") {
+      return <ReportsPage navigate={navigate} />;
     }
     // All other admin pages keep the existing dark AdminLayout
     return (
@@ -104,8 +110,6 @@ function PortalApp() {
         {page === "clients"     && <ClientsPage />}
         {page === "commissions" && <CommissionsPage />}
         {page === "payouts"     && <PayoutsPage />}
-        {page === "analytics"   && <AnalyticsPage />}
-        {page === "reports"     && <ReportsPage />}
       </AdminLayout>
     );
   }

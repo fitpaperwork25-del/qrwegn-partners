@@ -1,22 +1,37 @@
-import { Card } from "./AdminDashboard";
+const NAVY = "#0B1739";
 
-export default function ReportsPage() {
+export default function ReportsPage({ navigate }) {
   return (
-    <div>
-      <div style={{ marginBottom: 28 }}>
-        <h1 style={{ fontSize: 28, fontWeight: 700, color: "#ffffff", margin: 0 }}>Reports</h1>
-        <p style={{ fontSize: 15, color: "#a0c8e8", margin: "6px 0 0" }}>
-          Exportable commission statements, payout summaries, and pipeline reports.
+    <div style={{ minHeight: "100vh", background: "#f8fafc", fontFamily: "system-ui,-apple-system,Segoe UI,sans-serif", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 40 }}>
+      <div style={{ maxWidth: 560, width: "100%", textAlign: "center" }}>
+
+        {/* Icon */}
+        <div style={{ fontSize: 56, marginBottom: 24, lineHeight: 1 }}>📋</div>
+
+        {/* Coming Soon badge */}
+        <span style={{ display: "inline-block", fontSize: 12, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", background: "#f1f5f9", color: "#374151", padding: "5px 14px", borderRadius: 99, marginBottom: 24 }}>
+          Coming Soon
+        </span>
+
+        {/* Title */}
+        <h1 style={{ fontSize: 32, fontWeight: 800, color: "#111827", margin: "0 0 16px", letterSpacing: "-0.03em" }}>
+          Reports
+        </h1>
+
+        {/* Description */}
+        <p style={{ fontSize: 17, color: "#374151", lineHeight: 1.7, margin: "0 0 36px" }}>
+          Downloadable PDF and CSV reports for commissions, payouts, and lead pipeline are under development.
         </p>
+
+        {/* Back button */}
+        <button
+          onClick={() => navigate("dashboard")}
+          style={{ fontSize: 15, fontWeight: 700, padding: "12px 28px", borderRadius: 12, border: "none", background: NAVY, color: "#fff", cursor: "pointer", boxShadow: "0 2px 8px rgba(11,23,57,0.2)", transition: "opacity 0.15s" }}
+          onMouseEnter={(e) => e.currentTarget.style.opacity = "0.85"}
+          onMouseLeave={(e) => e.currentTarget.style.opacity = "1"}>
+          ← Back to Dashboard
+        </button>
       </div>
-      <Card style={{ textAlign: "center", padding: "80px 24px" }}>
-        <div style={{ fontSize: 52, marginBottom: 20 }}>📋</div>
-        <h2 style={{ fontSize: 22, fontWeight: 700, color: "#ffffff", margin: "0 0 12px" }}>Reports Coming Soon</h2>
-        <p style={{ color: "#7ab0cc", fontSize: 15, margin: "0 auto", maxWidth: 420, lineHeight: 1.7 }}>
-          Downloadable PDF and CSV reports for commissions, payouts, and lead pipeline
-          are under development.
-        </p>
-      </Card>
     </div>
   );
 }

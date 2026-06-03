@@ -82,6 +82,8 @@ export default function PartnerProfile({ partnerId, navigate }) {
   const [approvingId,      setApprovingId]      = useState(null);
   const [loginCreating,    setLoginCreating]    = useState(null);
   const [loginStatus,      setLoginStatus]      = useState({});
+  const [loginLinks,       setLoginLinks]       = useState({});
+  const [linkCopiedId,     setLinkCopiedId]     = useState(null);
 
   // ── Loaders ──────────────────────────────────────────────────────
 
@@ -221,6 +223,7 @@ export default function PartnerProfile({ partnerId, navigate }) {
       setLoginStatus(prev => ({ ...prev, [pr.id]: "exists" }));
     } else if (res.ok) {
       setLoginStatus(prev => ({ ...prev, [pr.id]: "done" }));
+      if (data.loginLink) setLoginLinks(prev => ({ ...prev, [pr.id]: data.loginLink }));
     } else {
       alert("Failed to create login: " + (data.error || "Unknown error"));
     }
@@ -522,7 +525,20 @@ export default function PartnerProfile({ partnerId, navigate }) {
                             </div>
                           )}
                           {!pr.isSubPartner && pr.status === "active" && (() => {
-                            const ls = loginStatus[pr.id];
+                            const ls   = loginStatus[pr.id];
+                            const link = loginLinks[pr.id];
+                            if (ls === "done" && link) return (
+                              <button
+                                onClick={e => {
+                                  e.stopPropagation();
+                                  navigator.clipboard.writeText(link);
+                                  setLinkCopiedId(pr.id);
+                                  setTimeout(() => setLinkCopiedId(null), 2000);
+                                }}
+                                style={{ padding: "4px 12px", borderRadius: 7, border: `1px solid ${linkCopiedId === pr.id ? "rgba(40,180,80,0.4)" : "rgba(100,160,220,0.4)"}`, background: linkCopiedId === pr.id ? "rgba(40,180,80,0.12)" : "rgba(100,160,220,0.12)", color: linkCopiedId === pr.id ? "#35c060" : "#5ab0f0", fontSize: 12, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>
+                                {linkCopiedId === pr.id ? "Copied ✓" : "Copy Login Link"}
+                              </button>
+                            );
                             if (ls === "done") return (
                               <span style={{ fontSize: 12, fontWeight: 600, color: "#35c060" }}>Login Active ✓</span>
                             );

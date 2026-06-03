@@ -33,7 +33,10 @@ export default async function handler(req, res) {
     return res.status(409).json({ error: "Login already exists for this promotor." });
   }
 
-  // Invite user — creates auth record and sends invite email with a login link
+  let userId    = null;
+  let loginLink = null;
+
+  // Primary path — invite by email (sends login link automatically)
   const { data: inviteData, error: inviteErr } = await supabaseAdmin.auth.admin.inviteUserByEmail(
     email,
     {
@@ -44,27 +47,54 @@ export default async function handler(req, res) {
 
   if (inviteErr) {
     const msg = inviteErr.message || "";
+
     if (msg.toLowerCase().includes("already registered") || msg.toLowerCase().includes("already been invited")) {
       return res.status(409).json({ error: "A login already exists for this email address." });
     }
-    return res.status(400).json({ error: msg });
+
+    // Rate-limit fallback: create user directly then generate a login link to share manually
+    if (msg.toLowerCase().includes("rate limit")) {
+      const { data: createData, error: createErr } = await supabaseAdmin.auth.admin.createUser({
+        email,
+        email_confirm: true,
+        user_metadata: { full_name: fullName },
+      });
+
+      if (createErr) {
+        return res.status(400).json({ error: "Rate limited and fallback user creation failed: " + createErr.message });
+      }
+
+      userId = createData.user.id;
+
+      // Generate a magic link the admin can copy and send manually
+      const { data: linkData } = await supabaseAdmin.auth.admin.generateLink({
+        type: "magiclink",
+        email,
+        options: { redirectTo: "https://qrwegn-partners.vercel.app" },
+      });
+
+      loginLink = linkData?.properties?.action_link || null;
+    } else {
+      return res.status(400).json({ error: msg });
+    }
+  } else {
+    userId = inviteData.user.id;
   }
 
-  // Insert profiles row linking this auth user to the promotor record
+  // Insert profiles row (shared for both paths)
   const profileInsert = {
-    id:          inviteData.user.id,
+    id:          userId,
     role:        "promotor",
     promotor_id: promotorId,
     full_name:   fullName || null,
   };
 
-  // Include email only if the column exists — safe to try; error is caught below
   const { error: profileErr } = await supabaseAdmin
     .from("profiles")
     .insert({ ...profileInsert, email });
 
   if (profileErr) {
-    // Retry without email if that column doesn't exist
+    // Retry without email if that column doesn't exist in the schema
     if (profileErr.message?.includes("email")) {
       const { error: retryErr } = await supabaseAdmin.from("profiles").insert(profileInsert);
       if (retryErr) {
@@ -79,5 +109,5 @@ export default async function handler(req, res) {
     }
   }
 
-  return res.json({ success: true, userId: inviteData.user.id });
+  return res.json({ success: true, userId, loginLink });
 }

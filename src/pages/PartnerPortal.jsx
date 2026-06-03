@@ -227,8 +227,9 @@ export default function PartnerPortal({ profile, onLogout }) {
   const [myPayouts, setMyPayouts] = useState([]);
   const [demoLinks, setDemoLinks] = useState([]);
   const [partnerId, setPartnerId] = useState(null);
-  const [commissionTxns, setCommissionTxns] = useState([]);
+  const [commissionTxns,  setCommissionTxns]  = useState([]);
   const [commTxnsLoading, setCommTxnsLoading] = useState(false);
+  const [commSummary,     setCommSummary]     = useState(null); // rows from commission_summary_with_payouts
 
   useEffect(() => {
     loadAll();
@@ -256,6 +257,7 @@ export default function PartnerPortal({ profile, onLogout }) {
       loadMyLeads(pid),
       loadMyPayouts(pid),
       loadCommissionTxns(pid),
+      loadCommSummary(pid),
       loadDemoLinks(),
       loadTraining(),
       loadMaterials(),
@@ -400,6 +402,16 @@ export default function PartnerPortal({ profile, onLogout }) {
     setCommTxnsLoading(false);
   };
 
+  const loadCommSummary = async (pid) => {
+    const id = pid ?? partnerId;
+    if (!id) return;
+    const { data, error } = await supabase
+      .from("commission_summary_with_payouts")
+      .select("*")
+      .eq("partner_id", id);
+    if (!error && data?.length) setCommSummary(data);
+  };
+
   const recruitPromotor = async () => {
     if (!recruitForm.full_name.trim()) return;
 
@@ -541,51 +553,74 @@ export default function PartnerPortal({ profile, onLogout }) {
   const reportData = useMemo(() => {
     const EARNING_STATUSES = ["signed", "active"];
 
-    // Leads by status
+    // Leads by status (unchanged)
     const byStatus = {};
     myLeads.forEach((l) => {
       const s = l.status || "new";
       byStatus[s] = (byStatus[s] || 0) + 1;
     });
 
-    // Partner commission per currency
-    const owedMap = {};
-    myLeads.forEach((l) => {
-      if (!EARNING_STATUSES.includes(l.status)) return;
-      if (l.monthly_value == null || l.partner_pct == null) return;
-      const cur = l.currency || "USD";
-      owedMap[cur] = (owedMap[cur] || 0) + (Number(l.monthly_value) * Number(l.partner_pct)) / 100;
-    });
-    const paidMap = {};
-    myPayouts.forEach((p) => {
-      const cur = p.currency || "USD";
-      paidMap[cur] = (paidMap[cur] || 0) + Number(p.amount || 0);
-    });
-    const commCurrencies = [...new Set([...Object.keys(owedMap), ...Object.keys(paidMap)])];
-    const commissionRows = commCurrencies.map((cur) => {
-      const owed = owedMap[cur] || 0;
-      const paid = paidMap[cur] || 0;
-      return { currency: cur, owed, paid, balance: Math.max(0, owed - paid), overpaid: paid > owed ? paid - owed : 0 };
-    });
+    // Partner commission — use commission_summary_with_payouts if loaded
+    const partnerRow = commSummary?.find((r) => !r.promotor_id) ?? commSummary?.[0] ?? null;
+    let commissionRows;
+    if (partnerRow) {
+      const owed  = Number(partnerRow.total_partner_commission || 0);
+      const paid  = Number(partnerRow.partner_paid            || 0);
+      const bal   = Number(partnerRow.partner_balance_due     ?? Math.max(0, owed - paid));
+      const over  = paid > owed ? paid - owed : 0;
+      commissionRows = [{ currency: "USD", owed, paid, balance: bal, overpaid: over }];
+    } else {
+      // Fallback: derive from myLeads + myPayouts
+      const owedMap = {};
+      myLeads.forEach((l) => {
+        if (!EARNING_STATUSES.includes(l.status)) return;
+        if (l.monthly_value == null || l.partner_pct == null) return;
+        const cur = l.currency || "USD";
+        owedMap[cur] = (owedMap[cur] || 0) + (Number(l.monthly_value) * Number(l.partner_pct)) / 100;
+      });
+      const paidMap = {};
+      myPayouts.forEach((p) => {
+        const cur = p.currency || "USD";
+        paidMap[cur] = (paidMap[cur] || 0) + Number(p.amount || 0);
+      });
+      const commCurrencies = [...new Set([...Object.keys(owedMap), ...Object.keys(paidMap)])];
+      commissionRows = commCurrencies.map((cur) => {
+        const owed = owedMap[cur] || 0; const paid = paidMap[cur] || 0;
+        return { currency: cur, owed, paid, balance: Math.max(0, owed - paid), overpaid: paid > owed ? paid - owed : 0 };
+      });
+    }
 
-    // Promotor performance
+    // Promotor performance — use per-promotor rows from view if available
+    const promotorViewRows = commSummary?.filter((r) => r.promotor_id) ?? [];
     const promotorRows = promotors.map((pr) => {
-      const prLeads = myLeads.filter((l) => l.submitted_by_promotor_id === pr.id);
+      const prLeads   = myLeads.filter((l) => l.submitted_by_promotor_id === pr.id);
       const earnLeads = prLeads.filter((l) => EARNING_STATUSES.includes(l.status));
+      const viewRow   = promotorViewRows.find((r) => r.promotor_id === pr.id) ?? null;
+      if (viewRow) {
+        const earned  = Number(viewRow.total_promotor_commission || 0);
+        const paid    = Number(viewRow.promotor_paid             || 0);
+        const balance = Number(viewRow.promotor_balance_due      ?? Math.max(0, earned - paid));
+        return {
+          id: pr.id, name: pr.full_name,
+          leadCount: prLeads.length, signedActiveCount: earnLeads.length,
+          earned, paid, balance,
+          commSummary: `USD ${earned.toFixed(2)}`,
+          hasViewData: true,
+        };
+      }
+      // Fallback: calculate from leads
       const commByCur = {};
       earnLeads.forEach((l) => {
         if (l.monthly_value == null || l.promotor_pct == null) return;
         const cur = l.currency || "USD";
         commByCur[cur] = (commByCur[cur] || 0) + (Number(l.monthly_value) * Number(l.promotor_pct)) / 100;
       });
-      const commSummary = Object.entries(commByCur)
-        .map(([cur, amt]) => `${cur} ${amt.toFixed(2)}`)
-        .join(", ") || "—";
-      return { id: pr.id, name: pr.full_name, leadCount: prLeads.length, signedActiveCount: earnLeads.length, commSummary };
+      const commStr = Object.entries(commByCur).map(([cur, amt]) => `${cur} ${amt.toFixed(2)}`).join(", ") || "—";
+      return { id: pr.id, name: pr.full_name, leadCount: prLeads.length, signedActiveCount: earnLeads.length, earned: null, paid: null, balance: null, commSummary: commStr, hasViewData: false };
     });
 
     return { byStatus, commissionRows, promotorRows };
-  }, [myLeads, myPayouts, promotors]);
+  }, [myLeads, myPayouts, promotors, commSummary]);
 
   const initials = profile?.full_name
     ? profile.full_name
@@ -908,7 +943,7 @@ export default function PartnerPortal({ profile, onLogout }) {
                   <table style={{ width: "100%", borderCollapse: "collapse" }}>
                     <thead>
                       <tr style={{ borderBottom: "1px solid rgba(50,80,140,0.35)" }}>
-                        {["Promotor", "Leads", "Signed / Active", "Commission Owed"].map((h) => (
+                        {["Promotor", "Leads", "Signed / Active", "Earned", "Paid", "Balance"].map((h) => (
                           <th key={h} style={{ padding: "7px 12px", textAlign: "left", fontSize: 11, color: "#4a7090", fontWeight: 700, letterSpacing: "0.08em", whiteSpace: "nowrap" }}>
                             {h.toUpperCase()}
                           </th>
@@ -925,7 +960,9 @@ export default function PartnerPortal({ profile, onLogout }) {
                           <td style={{ padding: "11px 12px", fontSize: 14, fontWeight: 600, color: "#c0d8e8" }}>{pr.name}</td>
                           <td style={{ padding: "11px 12px", fontSize: 14, color: "#a0c8e8" }}>{pr.leadCount}</td>
                           <td style={{ padding: "11px 12px", fontSize: 14, fontWeight: 700, color: "#5ab0f0" }}>{pr.signedActiveCount}</td>
-                          <td style={{ padding: "11px 12px", fontSize: 14, fontWeight: 700, color: "#e8c547" }}>{pr.commSummary}</td>
+                          <td style={{ padding: "11px 12px", fontSize: 14, fontWeight: 700, color: "#e8c547" }}>{pr.hasViewData ? `USD ${pr.earned.toFixed(2)}` : pr.commSummary}</td>
+                          <td style={{ padding: "11px 12px", fontSize: 14, fontWeight: 700, color: "#35c060" }}>{pr.hasViewData ? `USD ${pr.paid.toFixed(2)}` : "—"}</td>
+                          <td style={{ padding: "11px 12px", fontSize: 14, fontWeight: 700, color: pr.hasViewData && pr.balance > 0 ? "#e8c547" : "#35c060" }}>{pr.hasViewData ? `USD ${pr.balance.toFixed(2)}` : "—"}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -1562,9 +1599,17 @@ export default function PartnerPortal({ profile, onLogout }) {
         )}
 
         {tab === "commissions" && (() => {
-          const totalOwed = commissionTxns.reduce((s, tx) => s + Number(tx.partner_commission || 0), 0);
-          const totalPaid = myPayouts.reduce((s, p) => s + Number(p.amount || 0), 0);
-          const balanceDue = Math.max(0, totalOwed - totalPaid);
+          // Prefer commission_summary_with_payouts; fall back to raw aggregates
+          const summaryRow = commSummary?.find((r) => !r.promotor_id) ?? commSummary?.[0] ?? null;
+          const totalEarned = summaryRow
+            ? Number(summaryRow.total_partner_commission || 0)
+            : commissionTxns.reduce((s, tx) => s + Number(tx.partner_commission || 0), 0);
+          const totalPaid = summaryRow
+            ? Number(summaryRow.partner_paid || 0)
+            : myPayouts.reduce((s, p) => s + Number(p.amount || 0), 0);
+          const balanceDue = summaryRow
+            ? Number(summaryRow.partner_balance_due ?? Math.max(0, totalEarned - totalPaid))
+            : Math.max(0, totalEarned - totalPaid);
 
           return (
             <div style={{ display: "flex", flexDirection: "column", gap: 16, maxWidth: 900 }}>
@@ -1572,7 +1617,7 @@ export default function PartnerPortal({ profile, onLogout }) {
               {/* Summary cards */}
               <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 12 }}>
                 {[
-                  { label: "Total Earned",  value: `USD ${totalOwed.toFixed(2)}`,    color: "#a0c8e8" },
+                  { label: "Total Earned",  value: `USD ${totalEarned.toFixed(2)}`,  color: "#a0c8e8" },
                   { label: "Total Paid",    value: `USD ${totalPaid.toFixed(2)}`,    color: "#35c060" },
                   { label: "Balance Due",   value: `USD ${balanceDue.toFixed(2)}`,   color: balanceDue > 0 ? "#e8c547" : "#35c060" },
                 ].map((s) => (

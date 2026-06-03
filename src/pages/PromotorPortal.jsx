@@ -485,8 +485,8 @@ export default function PromotorPortal({ profile, onLogout }) {
                 <table style={{ width: "100%", borderCollapse: "collapse" }}>
                   <thead>
                     <tr style={{ borderBottom: "1px solid rgba(50,80,140,0.35)" }}>
-                      {["Business", "Contact", "Status", "Date"].map(h => (
-                        <th key={h} style={{ padding: "10px 14px", textAlign: "left", fontSize: 11, color: "#4a7090", fontWeight: 700, letterSpacing: "0.08em" }}>
+                      {["Business", "Contact", "Status", "Plan", "Monthly Value", "My Commission", "Date"].map(h => (
+                        <th key={h} style={{ padding: "10px 14px", textAlign: "left", fontSize: 11, color: "#4a7090", fontWeight: 700, letterSpacing: "0.08em", whiteSpace: "nowrap" }}>
                           {h.toUpperCase()}
                         </th>
                       ))}
@@ -506,6 +506,15 @@ export default function PromotorPortal({ profile, onLogout }) {
                           <span style={{ fontSize: 11, fontWeight: 700, padding: "3px 10px", borderRadius: 20, background: "rgba(100,160,220,0.18)", color: "#5ab0f0", textTransform: "uppercase", letterSpacing: "0.06em" }}>
                             {l.status || "new"}
                           </span>
+                        </td>
+                        <td style={{ padding: "12px 14px", fontSize: 13, color: "#a0c8e8" }}>{l.plan || "—"}</td>
+                        <td style={{ padding: "12px 14px", fontSize: 13, color: "#c8a84a", whiteSpace: "nowrap" }}>
+                          {l.monthly_value != null ? `${l.currency || "USD"} ${Number(l.monthly_value).toFixed(2)}` : "—"}
+                        </td>
+                        <td style={{ padding: "12px 14px", fontSize: 13, color: "#a0c8e8", whiteSpace: "nowrap" }}>
+                          {l.monthly_value != null && l.promotor_pct != null
+                            ? `${l.currency || "USD"} ${(l.monthly_value * l.promotor_pct / 100).toFixed(2)}`
+                            : "—"}
                         </td>
                         <td style={{ padding: "12px 14px", fontSize: 13, color: "#4a7090", whiteSpace: "nowrap" }}>{fmtDate(l.created_at)}</td>
                       </tr>

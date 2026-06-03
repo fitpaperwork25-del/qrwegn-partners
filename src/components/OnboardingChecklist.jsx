@@ -45,7 +45,7 @@ export default function OnboardingChecklist({ supabase, userId, role = 'promotor
     const isDone = done.has(stepKey);
     const next = new Set(done);
     if (isDone) next.delete(stepKey); else next.add(stepKey);
-    setDone(next); // optimistic
+    setDone(next);
 
     let error;
     if (isDone) {
@@ -64,9 +64,7 @@ export default function OnboardingChecklist({ supabase, userId, role = 'promotor
     }
 
     if (error) {
-      // revert on failure
-      const reverted = new Set(done);
-      setDone(reverted);
+      setDone(new Set(done));
     }
     setBusy(null);
   }
@@ -74,33 +72,52 @@ export default function OnboardingChecklist({ supabase, userId, role = 'promotor
   const completed = steps.filter((s) => done.has(s.key)).length;
   const pct = Math.round((completed / steps.length) * 100);
 
-  if (loading) return <div style={{ padding: 16 }}>Loading…</div>;
+  const card = {
+    background: 'rgba(10,20,45,0.95)',
+    backdropFilter: 'blur(16px)',
+    borderRadius: 16,
+    border: '1px solid rgba(50,80,140,0.3)',
+    boxShadow: '0 4px 28px rgba(0,0,0,0.35)',
+    padding: 24,
+  };
+
+  if (loading) {
+    return <div style={{ ...card, color: '#4a7090', fontSize: 13 }}>Loading…</div>;
+  }
 
   return (
-    <div style={{ maxWidth: 520, padding: 20, border: '1px solid #e5e5e5', borderRadius: 12 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 12 }}>
-        <h3 style={{ margin: 0 }}>Getting started</h3>
-        <span style={{ fontSize: 14, color: '#666' }}>{completed}/{steps.length}</span>
+    <div style={card}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+        <div style={{ fontSize: 11, fontWeight: 700, color: '#4a7090', letterSpacing: '0.12em' }}>
+          GETTING STARTED
+        </div>
+        <span style={{ fontSize: 12, fontWeight: 700, color: '#8fd0ff' }}>
+          {completed}/{steps.length}
+        </span>
       </div>
 
-      <div style={{ height: 6, background: '#eee', borderRadius: 4, marginBottom: 18, overflow: 'hidden' }}>
-        <div style={{ height: '100%', width: `${pct}%`, background: '#16a34a', transition: 'width .2s' }} />
+      <div style={{ height: 6, background: 'rgba(50,80,140,0.25)', borderRadius: 4, marginBottom: 18, overflow: 'hidden' }}>
+        <div style={{ height: '100%', width: `${pct}%`, background: '#4a90d9', transition: 'width .2s' }} />
       </div>
 
       <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
         {steps.map((s) => {
           const checked = done.has(s.key);
           return (
-            <li key={s.key} style={{ marginBottom: 10 }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', opacity: busy === s.key ? 0.6 : 1 }}>
+            <li key={s.key} style={{ marginBottom: 12 }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 11, cursor: 'pointer', opacity: busy === s.key ? 0.5 : 1 }}>
                 <input
                   type="checkbox"
                   checked={checked}
                   disabled={busy === s.key}
                   onChange={() => toggle(s.key)}
-                  style={{ width: 18, height: 18 }}
+                  style={{ width: 17, height: 17, accentColor: '#4a90d9', cursor: 'pointer' }}
                 />
-                <span style={{ textDecoration: checked ? 'line-through' : 'none', color: checked ? '#999' : '#111' }}>
+                <span style={{
+                  fontSize: 14,
+                  textDecoration: checked ? 'line-through' : 'none',
+                  color: checked ? '#4a7090' : '#cfe3f2',
+                }}>
                   {s.label}
                 </span>
               </label>
@@ -110,7 +127,7 @@ export default function OnboardingChecklist({ supabase, userId, role = 'promotor
       </ul>
 
       {pct === 100 && (
-        <div style={{ marginTop: 16, padding: 12, background: '#f0fdf4', borderRadius: 8, color: '#166534', fontSize: 14 }}>
+        <div style={{ marginTop: 16, padding: 12, background: 'rgba(74,144,217,0.12)', border: '1px solid rgba(74,144,217,0.3)', borderRadius: 8, color: '#8fd0ff', fontSize: 13 }}>
           All set — onboarding complete.
         </div>
       )}

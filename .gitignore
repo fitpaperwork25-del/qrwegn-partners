@@ -4,4 +4,6 @@ dist
 .env.local
 
 .vercel
-supabase/
+# track supabase/functions, ignore generated/secret files
+supabase/.temp/
+supabase/config.toml

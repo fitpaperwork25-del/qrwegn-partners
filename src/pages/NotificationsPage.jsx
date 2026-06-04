@@ -35,15 +35,22 @@ function fmtDate(iso) {
   });
 }
 
-const emptyForm = { recipient_email: "", subject: "", body: "" };
+const emptyForm = {
+  recipient_email:   "",
+  recipient_role:    "partner",
+  notification_type: "email",
+  subject:           "",
+  body:              "",
+};
 
 export default function NotificationsPage() {
-  const [logs,    setLogs]    = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [form,    setForm]    = useState(emptyForm);
-  const [saving,  setSaving]  = useState(false);
-  const [trigger, setTrigger] = useState({ loading: false, result: null });
-  const [filter,  setFilter]  = useState("all");
+  const [logs,        setLogs]        = useState([]);
+  const [loading,     setLoading]     = useState(true);
+  const [form,        setForm]        = useState(emptyForm);
+  const [saving,      setSaving]      = useState(false);
+  const [insertError, setInsertError] = useState("");
+  const [trigger,     setTrigger]     = useState({ loading: false, result: null });
+  const [filter,      setFilter]      = useState("all");
 
   const load = async () => {
     setLoading(true);
@@ -70,17 +77,21 @@ export default function NotificationsPage() {
   const createNotification = async () => {
     if (!form.recipient_email.trim() || !form.subject.trim() || !form.body.trim()) return;
     setSaving(true);
+    setInsertError("");
     const { error } = await supabase.from("notification_logs").insert({
-      recipient_email: form.recipient_email.trim(),
-      subject:         form.subject.trim(),
-      body:            form.body.trim(),
-      status:          "pending",
+      recipient_email:   form.recipient_email.trim(),
+      recipient_role:    form.recipient_role    || "partner",
+      notification_type: form.notification_type || "email",
+      subject:           form.subject.trim(),
+      body:              form.body.trim(),
+      status:            "pending",
     });
     if (!error) {
       setForm(emptyForm);
       await load();
     } else {
       console.error("createNotification error:", error);
+      setInsertError(error.message || "Insert failed — check console for details.");
     }
     setSaving(false);
   };
@@ -162,6 +173,15 @@ export default function NotificationsPage() {
             onChange={e => setForm(f => ({ ...f, recipient_email: e.target.value }))}
             style={inputStyle}
           />
+          <select
+            value={form.recipient_role}
+            onChange={e => setForm(f => ({ ...f, recipient_role: e.target.value }))}
+            style={{ ...inputStyle, flex: "0 0 auto", minWidth: 130, cursor: "pointer" }}
+          >
+            <option value="partner">Partner</option>
+            <option value="promotor">Promotor</option>
+            <option value="admin">Admin</option>
+          </select>
           <input
             placeholder="Subject"
             value={form.subject}
@@ -175,6 +195,15 @@ export default function NotificationsPage() {
             rows={3}
             style={{ ...inputStyle, flex: "1 1 100%", resize: "vertical", fontFamily: "monospace", fontSize: 12 }}
           />
+          {insertError && (
+            <div style={{
+              flex: "1 1 100%", background: "rgba(220,80,80,0.15)",
+              border: "1px solid rgba(220,80,80,0.4)", borderRadius: 8,
+              padding: "8px 12px", fontSize: 13, color: "#f07070",
+            }}>
+              Insert failed: {insertError}
+            </div>
+          )}
           <button
             onClick={createNotification}
             disabled={saving || !form.recipient_email || !form.subject || !form.body}

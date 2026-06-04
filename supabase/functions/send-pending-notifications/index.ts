@@ -17,7 +17,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
   try {
     const supabaseUrl        = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const resendApiKey       = Deno.env.get("RESEND_API_KEY")!;
+    const resendApiKey       = Deno.env.get("RESEND_API_KEY");
 
     if (!resendApiKey) {
       return new Response(
@@ -54,7 +54,8 @@ Deno.serve(async (req: Request): Promise<Response> => {
     let failed = 0;
 
     for (const row of rows) {
-      let success = false;
+      let success      = false;
+      let errorMessage = "";
 
       try {
         const res = await fetch(RESEND_API_URL, {
@@ -75,15 +76,17 @@ Deno.serve(async (req: Request): Promise<Response> => {
           success = true;
         } else {
           const errBody = await res.text();
-          console.error(`Resend rejected ${row.id}: ${res.status} ${errBody}`);
+          errorMessage  = `Resend ${res.status}: ${errBody}`;
+          console.error(`Resend rejected ${row.id}: ${errorMessage}`);
         }
       } catch (sendErr) {
+        errorMessage = `Network error: ${String(sendErr)}`;
         console.error(`Network error sending ${row.id}:`, sendErr);
       }
 
       const patch = success
-        ? { status: "sent",   sent_at: new Date().toISOString() }
-        : { status: "failed"                                      };
+        ? { status: "sent",   sent_at: new Date().toISOString(), error_message: null }
+        : { status: "failed", error_message: errorMessage };
 
       const { error: updateError } = await supabase
         .from("notification_logs")

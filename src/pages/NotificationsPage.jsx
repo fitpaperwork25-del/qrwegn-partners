@@ -206,7 +206,7 @@ export default function NotificationsPage() {
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
               <thead>
                 <tr style={{ borderBottom: "1px solid rgba(100,160,220,0.35)" }}>
-                  {["Recipient", "Subject", "Status", "Created", "Sent at", ""].map(h => (
+                  {["Recipient", "Subject", "Status", "Created", "Sent at", "Error", ""].map(h => (
                     <th key={h} style={{
                       padding: "8px 14px", textAlign: "left", fontSize: 11,
                       color: "#a0c8e8", fontWeight: 700, letterSpacing: "0.08em", whiteSpace: "nowrap",
@@ -228,6 +228,9 @@ export default function NotificationsPage() {
                     <td style={{ padding: "10px 14px" }}><StatusBadge status={row.status} /></td>
                     <td style={{ padding: "10px 14px", fontSize: 12, color: "#7ab0cc", whiteSpace: "nowrap" }}>{fmtDate(row.created_at)}</td>
                     <td style={{ padding: "10px 14px", fontSize: 12, color: "#7ab0cc", whiteSpace: "nowrap" }}>{fmtDate(row.sent_at)}</td>
+                    <td style={{ padding: "10px 14px", fontSize: 11, color: "#f07070", maxWidth: 260 }}>
+                      {row.error_message || "—"}
+                    </td>
                     <td style={{ padding: "10px 14px" }}>
                       <button
                         onClick={() => deleteLog(row.id)}

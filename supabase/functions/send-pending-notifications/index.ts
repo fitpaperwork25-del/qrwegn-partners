@@ -10,20 +10,25 @@ const RESEND_API_URL = "https://api.resend.com/emails";
 const FROM_ADDRESS   = "QR-Wegn Partners <info@qrwegn.com>";
 
 Deno.serve(async (req: Request): Promise<Response> => {
+  // OPTIONS must be handled before touching any env vars or Supabase
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
+
+  const json = (body: unknown, status = 200) =>
+    new Response(JSON.stringify(body), {
+      status,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
 
   try {
     const supabaseUrl        = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const resendApiKey       = Deno.env.get("RESEND_API_KEY");
 
+    // Path 1 — missing API key: mark nothing as failed, just return error
     if (!resendApiKey) {
-      return new Response(
-        JSON.stringify({ error: "RESEND_API_KEY secret is not set." }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return json({ error: "RESEND_API_KEY not configured" }, 500);
     }
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
@@ -36,27 +41,23 @@ Deno.serve(async (req: Request): Promise<Response> => {
       .limit(50);
 
     if (fetchError) {
-      console.error("Failed to fetch notification_logs:", fetchError.message);
-      return new Response(
-        JSON.stringify({ error: fetchError.message }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return json({ error: `DB fetch failed: ${fetchError.message}` }, 500);
     }
 
     if (!rows || rows.length === 0) {
-      return new Response(
-        JSON.stringify({ sent: 0, failed: 0, message: "No pending notifications." }),
-        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return json({ sent: 0, failed: 0, message: "No pending notifications." });
     }
 
-    let sent   = 0;
-    let failed = 0;
+    let sent        = 0;
+    let failed      = 0;
+    const updateErrors: string[] = [];
 
     for (const row of rows) {
+      // errorMessage is always a non-empty string before the DB write
       let success      = false;
-      let errorMessage = "";
+      let errorMessage = "Unknown error";   // never empty — ensures DB always receives a real value
 
+      // ── Attempt Resend delivery ─────────────────────────────────────────
       try {
         const res = await fetch(RESEND_API_URL, {
           method: "POST",
@@ -73,28 +74,48 @@ Deno.serve(async (req: Request): Promise<Response> => {
         });
 
         if (res.ok) {
-          success = true;
+          success      = true;
+          errorMessage = "";   // cleared on success — written as null below
         } else {
-          const errBody = await res.text();
-          errorMessage  = `Resend ${res.status}: ${errBody}`;
-          console.error(`Resend rejected ${row.id}: ${errorMessage}`);
+          // Path 2 — Resend non-2xx: capture full response body
+          const errBody    = await res.text();
+          errorMessage     = `Resend ${res.status}: ${errBody}`;
+          console.error(`[${row.id}] Resend rejected: ${errorMessage}`);
         }
       } catch (sendErr) {
-        errorMessage = `Network error: ${String(sendErr)}`;
-        console.error(`Network error sending ${row.id}:`, sendErr);
+        // Path 3 — network / fetch exception
+        errorMessage = `Exception: ${String(sendErr)}`;
+        console.error(`[${row.id}] Fetch threw: ${errorMessage}`);
       }
 
+      // ── Write result back to DB ─────────────────────────────────────────
+      // .select() forces PostgREST to read the columns back, which surfaces
+      // any schema-cache mismatch as an explicit error instead of silent drop.
       const patch = success
         ? { status: "sent",   sent_at: new Date().toISOString(), error_message: null }
         : { status: "failed", error_message: errorMessage };
 
-      const { error: updateError } = await supabase
+      const { data: updated, error: updateError } = await supabase
         .from("notification_logs")
         .update(patch)
-        .eq("id", row.id);
+        .eq("id", row.id)
+        .select("id, status, error_message")
+        .single();
 
       if (updateError) {
-        console.error(`Failed to update row ${row.id}:`, updateError.message);
+        // Surface update errors in the response — if error_message column is
+        // missing from PostgREST schema cache this will now be explicit.
+        const msg = `DB update failed for ${row.id}: ${updateError.message}`;
+        console.error(msg);
+        updateErrors.push(msg);
+      } else {
+        // Verify the write actually landed
+        const savedError = updated?.error_message;
+        if (!success && !savedError) {
+          const msg = `[${row.id}] error_message was not persisted — PostgREST schema cache may be stale`;
+          console.error(msg);
+          updateErrors.push(msg);
+        }
       }
 
       if (success) sent++; else failed++;
@@ -102,16 +123,10 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
     console.log(`send-pending-notifications: sent=${sent} failed=${failed}`);
 
-    return new Response(
-      JSON.stringify({ sent, failed, total: rows.length }),
-      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return json({ sent, failed, total: rows.length, updateErrors });
 
   } catch (err) {
     console.error("Unhandled error:", err);
-    return new Response(
-      JSON.stringify({ error: String(err) }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return json({ error: `Exception: ${String(err)}` }, 500);
   }
 });

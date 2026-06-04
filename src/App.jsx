@@ -16,6 +16,7 @@ import CommissionsPage  from "./pages/CommissionsPage";
 import PayoutsPage      from "./pages/PayoutsPage";
 import AnalyticsPage    from "./pages/AnalyticsPage";
 import ReportsPage      from "./pages/ReportsPage";
+import NotificationsPage from "./pages/NotificationsPage";
 
 // Top-level router — no hooks here so the /join early-return is rules-of-hooks safe
 export default function App() {
@@ -109,7 +110,8 @@ function PortalApp() {
         {page === "leads"       && <LeadsPage navigate={navigate} />}
         {page === "clients"     && <ClientsPage />}
         {page === "commissions" && <CommissionsPage />}
-        {page === "payouts"     && <PayoutsPage />}
+        {page === "payouts"        && <PayoutsPage />}
+        {page === "notifications"  && <NotificationsPage />}
       </AdminLayout>
     );
   }
@@ -215,7 +217,8 @@ function AdminLayout({ children, page, navigate, onLogout, profile }) {
     { id: "training",    label: "Training",    icon: "◎" },
     { id: "analytics",   label: "Analytics",   icon: "▦" },
     { id: "reports",     label: "Reports",     icon: "◧" },
-    { id: "materials",   label: "Resources",   icon: "◇" },
+    { id: "materials",      label: "Resources",      icon: "◇" },
+    { id: "notifications",  label: "Notifications",  icon: "◈" },
   ];
 
   return (

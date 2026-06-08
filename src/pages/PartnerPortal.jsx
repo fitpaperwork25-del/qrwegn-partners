@@ -475,6 +475,34 @@ export default function PartnerPortal({ profile, onLogout }) {
       } catch (e) {
         console.warn("create-promotor-login request failed:", e);
       }
+
+      // Best-effort: queue onboarding notification log rows. Never blocks success.
+      try {
+        const partnerName = profile?.full_name || "A partner";
+        const { error: notifyErr } = await supabase.from("notification_logs").insert([
+          {
+            recipient_role: "admin",
+            recipient_email: "info@qrwegn.com",
+            notification_type: "promotor_recruited",
+            subject: "New promotor recruited",
+            body: `${partnerName} recruited a new promotor: ${trimmedName} (${trimmedEmail}).`,
+            status: "pending",
+          },
+          {
+            recipient_role: "promotor",
+            recipient_email: trimmedEmail,
+            notification_type: "promotor_onboarding",
+            subject: "Welcome to QR-Wegn Partners",
+            body: `Hi ${trimmedName}, welcome to QR-Wegn Partners! Your account is being set up and you'll receive your login details shortly.`,
+            status: "pending",
+          },
+        ]);
+        if (notifyErr) {
+          console.warn("notification_logs insert failed:", notifyErr.message || notifyErr);
+        }
+      } catch (e) {
+        console.warn("notification_logs insert request failed:", e);
+      }
     }
 
     setRecruitForm({

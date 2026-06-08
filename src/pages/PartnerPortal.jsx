@@ -224,6 +224,7 @@ export default function PartnerPortal({ profile, onLogout }) {
   const [recruitError, setRecruitError] = useState("");
   const [showRecruitForm, setShowRecruitForm] = useState(false);
   const [recruitCredentials, setRecruitCredentials] = useState(null);
+  const [loginSetupNotice, setLoginSetupNotice] = useState("");
   const [myLeads, setMyLeads] = useState([]);
   const [myPayouts, setMyPayouts] = useState([]);
   const [demoLinks, setDemoLinks] = useState([]);
@@ -239,6 +240,7 @@ export default function PartnerPortal({ profile, onLogout }) {
   // Transient-only: never persist temporary credentials past the current view.
   useEffect(() => {
     setRecruitCredentials(null);
+    setLoginSetupNotice("");
   }, [tab]);
 
   const loadAll = async () => {
@@ -478,11 +480,16 @@ export default function PartnerPortal({ profile, onLogout }) {
         if (res.ok) {
           if (data?.tempPassword) {
             setRecruitCredentials({ email: trimmedEmail, tempPassword: data.tempPassword });
+            setLoginSetupNotice("");
+          } else {
+            setLoginSetupNotice("Promotor created, but no temporary password was returned. A login may already exist for this email.");
           }
         } else {
+          setLoginSetupNotice(data.error || "Promotor created, but login setup failed.");
           console.warn("create-promotor-login failed:", data.error || res.status);
         }
       } catch (e) {
+        setLoginSetupNotice("Promotor created, but login setup could not be completed. Please try again or contact admin.");
         console.warn("create-promotor-login request failed:", e);
       }
 
@@ -1547,7 +1554,7 @@ export default function PartnerPortal({ profile, onLogout }) {
               }}
             >
               <button
-                onClick={() => { setShowRecruitForm(true); setRecruitError(""); setRecruitCredentials(null); }}
+                onClick={() => { setShowRecruitForm(true); setRecruitError(""); setRecruitCredentials(null); setLoginSetupNotice(""); }}
                 style={{
                   padding: "8px 18px",
                   borderRadius: 8,
@@ -2069,16 +2076,31 @@ export default function PartnerPortal({ profile, onLogout }) {
         </div>
       )}
 
+      {loginSetupNotice && !recruitCredentials && (
+        <div style={{
+          position: "fixed", bottom: 24, right: 24, maxWidth: 380, zIndex: 220,
+          background: "rgba(240,180,60,0.14)", border: "1px solid rgba(240,180,60,0.4)",
+          borderRadius: 12, padding: "14px 16px", display: "flex", alignItems: "flex-start", gap: 10,
+          boxShadow: "0 8px 30px rgba(0,0,0,0.4)",
+        }}>
+          <span style={{ fontSize: 13, color: "#f0c040", lineHeight: 1.5, flex: 1 }}>{loginSetupNotice}</span>
+          <button
+            onClick={() => setLoginSetupNotice("")}
+            style={{ background: "none", border: "none", color: "#f0c040", fontSize: 16, cursor: "pointer", lineHeight: 1, padding: 0 }}
+          >✕</button>
+        </div>
+      )}
+
       {recruitCredentials && (
         <div
-          onClick={(e) => { if (e.target === e.currentTarget) setRecruitCredentials(null); }}
+          onClick={(e) => { if (e.target === e.currentTarget) { setRecruitCredentials(null); setLoginSetupNotice(""); } }}
           style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.65)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 210, padding: 24 }}
         >
           <div style={{ background: "#0b1739", border: "1px solid rgba(50,80,140,0.4)", borderRadius: 18, padding: "32px 28px", width: "100%", maxWidth: 440, boxShadow: "0 8px 40px rgba(0,0,0,0.5)" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
               <h2 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: "#ffffff" }}>Promotor Created Successfully</h2>
               <button
-                onClick={() => setRecruitCredentials(null)}
+                onClick={() => { setRecruitCredentials(null); setLoginSetupNotice(""); }}
                 style={{ background: "none", border: "none", color: "#4a7090", fontSize: 20, cursor: "pointer", lineHeight: 1, padding: "0 4px" }}
               >✕</button>
             </div>

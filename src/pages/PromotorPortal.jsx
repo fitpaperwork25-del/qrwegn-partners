@@ -3,11 +3,12 @@ import { supabase } from "../lib/supabase";
 import OnboardingChecklist from "../components/OnboardingChecklist";
 
 const TABS = [
-  { id: "home",      label: "Home"         },
-  { id: "leads",     label: "Submit Lead"  },
-  { id: "my-leads",  label: "My Leads"     },
-  { id: "training",  label: "Training"     },
-  { id: "materials", label: "Materials"    },
+  { id: "home",        label: "Home"         },
+  { id: "leads",       label: "Submit Lead"  },
+  { id: "my-leads",    label: "My Leads"     },
+  { id: "commissions", label: "Commissions"  },
+  { id: "training",    label: "Training"     },
+  { id: "materials",   label: "Materials"    },
 ];
 
 const DEFAULT_TRAINING = [
@@ -604,6 +605,144 @@ export default function PromotorPortal({ profile, onLogout }) {
             </Card>
           </div>
         )}
+
+        {/* COMMISSIONS */}
+        {tab === "commissions" && (() => {
+          const EARNING_STATUSES = ["signed", "active"];
+          const owedByCurrency = {};
+          myLeads.forEach(l => {
+            if (!EARNING_STATUSES.includes(l.status)) return;
+            if (l.monthly_value == null || l.promotor_pct == null) return;
+            const cur = l.currency || "USD";
+            owedByCurrency[cur] = (owedByCurrency[cur] || 0) + l.monthly_value * l.promotor_pct / 100;
+          });
+          const paidByCurrency = {};
+          myPayouts.forEach(p => {
+            const cur = p.currency || "USD";
+            paidByCurrency[cur] = (paidByCurrency[cur] || 0) + Number(p.amount);
+          });
+          const allCurrencies = [...new Set([...Object.keys(owedByCurrency), ...Object.keys(paidByCurrency)])];
+          const summaryRows = allCurrencies.map(cur => ({
+            currency: cur,
+            owed: owedByCurrency[cur] || 0,
+            paid: paidByCurrency[cur] || 0,
+            balance: (owedByCurrency[cur] || 0) - (paidByCurrency[cur] || 0),
+          }));
+          const commissionLeads = myLeads.filter(l => l.monthly_value != null && l.promotor_pct != null);
+
+          return (
+            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+
+              {/* Summary */}
+              <Card>
+                <SectionLabel>EARNINGS SUMMARY</SectionLabel>
+                {summaryRows.length === 0 ? (
+                  <p style={{ fontSize: 14, color: "#3a5a70", margin: 0 }}>No commissions yet.</p>
+                ) : (
+                  <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                    <thead>
+                      <tr style={{ borderBottom: "1px solid rgba(50,80,140,0.35)" }}>
+                        {["Currency", "Total Earned", "Total Paid", "Balance"].map(h => (
+                          <th key={h} style={{ padding: "7px 12px", textAlign: "left", fontSize: 11, color: "#4a7090", fontWeight: 700, letterSpacing: "0.08em" }}>
+                            {h.toUpperCase()}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {summaryRows.map(r => (
+                        <tr key={r.currency} style={{ borderBottom: "1px solid rgba(50,80,140,0.14)" }}>
+                          <td style={{ padding: "10px 12px", fontSize: 13, color: "#7ab0cc" }}>{r.currency}</td>
+                          <td style={{ padding: "10px 12px", fontSize: 13, color: "#a0c8e8", whiteSpace: "nowrap" }}>{r.currency} {r.owed.toFixed(2)}</td>
+                          <td style={{ padding: "10px 12px", fontSize: 13, color: "#a0c8e8", whiteSpace: "nowrap" }}>{r.currency} {r.paid.toFixed(2)}</td>
+                          <td style={{ padding: "10px 12px", fontSize: 14, fontWeight: 700, color: r.balance > 0 ? "#e8c547" : "#7ac77a", whiteSpace: "nowrap" }}>{r.currency} {r.balance.toFixed(2)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </Card>
+
+              {/* Per-lead commission */}
+              <Card>
+                <SectionLabel>COMMISSION BY LEAD</SectionLabel>
+                {commissionLeads.length === 0 ? (
+                  <p style={{ fontSize: 14, color: "#3a5a70", margin: 0 }}>No commissions yet.</p>
+                ) : (
+                  <div style={{ overflowX: "auto" }}>
+                    <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                      <thead>
+                        <tr style={{ borderBottom: "1px solid rgba(50,80,140,0.35)" }}>
+                          {["Business", "Status", "Monthly Value", "My Commission"].map(h => (
+                            <th key={h} style={{ padding: "8px 12px", textAlign: "left", fontSize: 11, color: "#4a7090", fontWeight: 700, letterSpacing: "0.08em", whiteSpace: "nowrap" }}>
+                              {h.toUpperCase()}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {commissionLeads.map((l, i) => (
+                          <tr key={l.id} style={{ borderBottom: i < commissionLeads.length - 1 ? "1px solid rgba(50,80,140,0.14)" : "none" }}
+                            onMouseEnter={e => e.currentTarget.style.background = "rgba(80,140,210,0.07)"}
+                            onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+                          >
+                            <td style={{ padding: "11px 12px", fontSize: 14, fontWeight: 600, color: "#ffffff" }}>{l.business_name}</td>
+                            <td style={{ padding: "11px 12px" }}>
+                              <span style={{ fontSize: 11, fontWeight: 700, padding: "3px 10px", borderRadius: 20, background: "rgba(100,160,220,0.18)", color: "#5ab0f0", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                                {l.status || "new"}
+                              </span>
+                            </td>
+                            <td style={{ padding: "11px 12px", fontSize: 13, color: "#c8a84a", whiteSpace: "nowrap" }}>
+                              {l.currency || "USD"} {Number(l.monthly_value).toFixed(2)}
+                            </td>
+                            <td style={{ padding: "11px 12px", fontSize: 13, fontWeight: 600, color: EARNING_STATUSES.includes(l.status) ? "#a0c8e8" : "#4a7090", whiteSpace: "nowrap" }}>
+                              {l.currency || "USD"} {(l.monthly_value * l.promotor_pct / 100).toFixed(2)}
+                              {!EARNING_STATUSES.includes(l.status) && (
+                                <span style={{ fontSize: 10, color: "#3a5a70", marginLeft: 6 }}>(pending)</span>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </Card>
+
+              {/* Payout history */}
+              <Card>
+                <SectionLabel>PAYOUT HISTORY</SectionLabel>
+                {myPayouts.length === 0 ? (
+                  <p style={{ fontSize: 14, color: "#3a5a70", margin: 0 }}>No payouts recorded yet.</p>
+                ) : (
+                  <div style={{ overflowX: "auto" }}>
+                    <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                      <thead>
+                        <tr style={{ borderBottom: "1px solid rgba(50,80,140,0.35)" }}>
+                          {["Date", "Amount", "Note"].map(h => (
+                            <th key={h} style={{ padding: "8px 12px", textAlign: "left", fontSize: 11, color: "#4a7090", fontWeight: 700, letterSpacing: "0.08em" }}>
+                              {h.toUpperCase()}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {myPayouts.map((p, i) => (
+                          <tr key={p.id} style={{ borderBottom: i < myPayouts.length - 1 ? "1px solid rgba(50,80,140,0.14)" : "none" }}>
+                            <td style={{ padding: "11px 12px", fontSize: 13, color: "#7ab0cc", whiteSpace: "nowrap" }}>{fmtDate(p.paid_on)}</td>
+                            <td style={{ padding: "11px 12px", fontSize: 13, fontWeight: 700, color: "#35c060", whiteSpace: "nowrap" }}>{p.currency || "USD"} {Number(p.amount).toFixed(2)}</td>
+                            <td style={{ padding: "11px 12px", fontSize: 13, color: "#7ab0cc" }}>{p.note || "—"}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </Card>
+
+            </div>
+          );
+        })()}
 
         {/* TRAINING */}
         {tab === "training" && (

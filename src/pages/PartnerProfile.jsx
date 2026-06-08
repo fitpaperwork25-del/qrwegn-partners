@@ -86,6 +86,11 @@ export default function PartnerProfile({ partnerId, navigate }) {
   const [loginLinks,       setLoginLinks]       = useState({});
   const [linkCopiedId,     setLinkCopiedId]     = useState(null);
 
+  // Partner's own login state
+  const [partnerLoginExists,   setPartnerLoginExists]   = useState(null);
+  const [partnerLoginCreating, setPartnerLoginCreating] = useState(false);
+  const [partnerCredentials,   setPartnerCredentials]   = useState(null);
+
   // Payout modal
   const [showPayoutModal,  setShowPayoutModal]  = useState(false);
   const [savingPayout,     setSavingPayout]     = useState(false);
@@ -108,6 +113,18 @@ export default function PartnerProfile({ partnerId, navigate }) {
         if (!error && data) setPartner(data);
         setLoading(false);
       });
+  }, [partnerId]);
+
+  useEffect(() => {
+    if (!partnerId) return;
+    setPartnerLoginExists(null);
+    setPartnerCredentials(null);
+    supabase
+      .from("profiles")
+      .select("id")
+      .eq("partner_id", partnerId)
+      .maybeSingle()
+      .then(({ data }) => setPartnerLoginExists(!!data));
   }, [partnerId]);
 
   const loadComms = async () => {
@@ -243,6 +260,29 @@ export default function PartnerProfile({ partnerId, navigate }) {
     }
   };
 
+  const handleCreatePartnerLogin = async () => {
+    setPartnerLoginCreating(true);
+    const { data: { session } } = await supabase.auth.getSession();
+    const res = await fetch("/api/create-partner-login", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${session?.access_token}`,
+      },
+      body: JSON.stringify({ partnerId, email: partner.email, fullName: partner.full_name }),
+    });
+    const data = await res.json().catch(() => ({}));
+    setPartnerLoginCreating(false);
+    if (res.ok && data.tempPassword) {
+      setPartnerLoginExists(true);
+      setPartnerCredentials({ email: partner.email, tempPassword: data.tempPassword });
+    } else if (res.status === 409) {
+      setPartnerLoginExists(true);
+    } else {
+      alert("Failed to create login: " + (data.error || "Unknown error"));
+    }
+  };
+
   const loadPayouts = async () => {
     if (!partnerId) return;
     const { data } = await supabase
@@ -372,6 +412,25 @@ export default function PartnerProfile({ partnerId, navigate }) {
           </div>
           <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 10 }}>
             <StageBadge stage={partner.stage || "Identified"} />
+            {partnerLoginExists === false && (
+              <button
+                onClick={handleCreatePartnerLogin}
+                disabled={partnerLoginCreating || !partner.email}
+                style={{
+                  padding: "7px 14px", borderRadius: 8, fontSize: 13, fontWeight: 600,
+                  border: "1.5px solid rgba(80,160,230,0.45)",
+                  background: "rgba(80,160,230,0.14)",
+                  color: partnerLoginCreating || !partner.email ? "#7ab0cc" : "#5ab0f0",
+                  cursor: partnerLoginCreating || !partner.email ? "default" : "pointer",
+                  whiteSpace: "nowrap", transition: "all 0.15s",
+                }}
+              >
+                {partnerLoginCreating ? "Creating..." : !partner.email ? "No email on file" : "Create Login"}
+              </button>
+            )}
+            {partnerLoginExists === true && !partnerCredentials && (
+              <span style={{ fontSize: 12, fontWeight: 600, color: "#35c060" }}>Login Active ✓</span>
+            )}
             <button
               onClick={() => {
                 const link = `https://qrwegn-partners.vercel.app/join/${partnerId}`;
@@ -964,6 +1023,44 @@ export default function PartnerProfile({ partnerId, navigate }) {
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {partnerCredentials && (
+        <div style={{
+          position: "fixed", bottom: 24, right: 24, maxWidth: 400, zIndex: 220,
+          background: "rgba(10,22,50,0.97)", border: "1px solid rgba(80,160,230,0.45)",
+          borderRadius: 14, padding: "20px 22px",
+          boxShadow: "0 8px 40px rgba(0,0,0,0.55)",
+        }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+            <span style={{ fontSize: 13, fontWeight: 700, color: "#5ab0f0", letterSpacing: "0.06em" }}>LOGIN CREATED</span>
+            <button onClick={() => setPartnerCredentials(null)}
+              style={{ background: "none", border: "none", color: "#7ab0cc", fontSize: 18, cursor: "pointer", lineHeight: 1, padding: 0 }}>
+              ✕
+            </button>
+          </div>
+          <p style={{ fontSize: 12, color: "#7ab0cc", margin: "0 0 14px", lineHeight: 1.5 }}>
+            Share these credentials with the partner. This panel will not reappear once closed.
+          </p>
+          {[
+            { label: "EMAIL",    value: partnerCredentials.email },
+            { label: "PASSWORD", value: partnerCredentials.tempPassword },
+          ].map(({ label, value }) => (
+            <div key={label} style={{ marginBottom: 10 }}>
+              <div style={{ fontSize: 11, color: "#7ab0cc", letterSpacing: "0.06em", marginBottom: 4 }}>{label}</div>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <code style={{ flex: 1, fontSize: 14, fontWeight: 600, color: "#ffffff", background: "rgba(255,255,255,0.06)", padding: "6px 10px", borderRadius: 7, wordBreak: "break-all" }}>
+                  {value}
+                </code>
+                <button
+                  onClick={() => navigator.clipboard.writeText(value)}
+                  style={{ padding: "5px 10px", borderRadius: 7, border: "1px solid rgba(100,160,220,0.4)", background: "rgba(100,160,220,0.12)", color: "#5ab0f0", fontSize: 12, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>
+                  Copy
+                </button>
+              </div>
+            </div>
+          ))}
         </div>
       )}
     </div>

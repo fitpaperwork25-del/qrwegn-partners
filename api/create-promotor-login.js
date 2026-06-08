@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import crypto from "crypto";
 
 const supabaseAdmin = createClient(
   process.env.SUPABASE_URL,
@@ -59,51 +60,32 @@ export default async function handler(req, res) {
 
   let userId    = null;
   let loginLink = null;
+  const tempPassword = crypto.randomBytes(9).toString("base64url");
 
-  // Primary path — invite by email (sends login link automatically)
-  const { data: inviteData, error: inviteErr } = await supabaseAdmin.auth.admin.inviteUserByEmail(
+  // Primary path — create the account directly with a temporary password.
+  // Avoids depending on outbound invite-email delivery.
+  const { data: createData, error: createErr } = await supabaseAdmin.auth.admin.createUser({
     email,
-    {
-      data: { full_name: fullName },
-      redirectTo: "https://qrwegn-partners.vercel.app",
-    }
-  );
+    password: tempPassword,
+    email_confirm: true,
+    user_metadata: { full_name: fullName },
+  });
 
-  if (inviteErr) {
-    const msg = inviteErr.message || "";
+  if (createErr) {
+    const msg = createErr.message || "";
 
-    if (msg.toLowerCase().includes("already registered") || msg.toLowerCase().includes("already been invited")) {
+    if (
+      msg.toLowerCase().includes("already registered") ||
+      msg.toLowerCase().includes("already been invited") ||
+      msg.toLowerCase().includes("already exists")
+    ) {
       return res.status(409).json({ error: "A login already exists for this email address." });
     }
 
-    // Rate-limit fallback: create user directly then generate a login link to share manually
-    if (msg.toLowerCase().includes("rate limit")) {
-      const { data: createData, error: createErr } = await supabaseAdmin.auth.admin.createUser({
-        email,
-        email_confirm: true,
-        user_metadata: { full_name: fullName },
-      });
-
-      if (createErr) {
-        return res.status(400).json({ error: "Rate limited and fallback user creation failed: " + createErr.message });
-      }
-
-      userId = createData.user.id;
-
-      // Generate a magic link the admin can copy and send manually
-      const { data: linkData } = await supabaseAdmin.auth.admin.generateLink({
-        type: "magiclink",
-        email,
-        options: { redirectTo: "https://qrwegn-partners.vercel.app" },
-      });
-
-      loginLink = linkData?.properties?.action_link || null;
-    } else {
-      return res.status(400).json({ error: msg });
-    }
-  } else {
-    userId = inviteData.user.id;
+    return res.status(400).json({ error: msg });
   }
+
+  userId = createData.user.id;
 
   // Insert profiles row (shared for both paths)
   const profileInsert = {
@@ -133,5 +115,10 @@ export default async function handler(req, res) {
     }
   }
 
-  return res.json({ success: true, userId, loginLink });
+  return res.json({
+    success: true,
+    userId,
+    loginLink,
+    tempPassword,
+  });
 }

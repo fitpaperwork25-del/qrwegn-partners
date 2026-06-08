@@ -223,6 +223,7 @@ export default function PartnerPortal({ profile, onLogout }) {
   const [recruitSuccess, setRecruitSuccess] = useState(false);
   const [recruitError, setRecruitError] = useState("");
   const [showRecruitForm, setShowRecruitForm] = useState(false);
+  const [recruitCredentials, setRecruitCredentials] = useState(null);
   const [myLeads, setMyLeads] = useState([]);
   const [myPayouts, setMyPayouts] = useState([]);
   const [demoLinks, setDemoLinks] = useState([]);
@@ -234,6 +235,11 @@ export default function PartnerPortal({ profile, onLogout }) {
   useEffect(() => {
     loadAll();
   }, []);
+
+  // Transient-only: never persist temporary credentials past the current view.
+  useEffect(() => {
+    setRecruitCredentials(null);
+  }, [tab]);
 
   const loadAll = async () => {
     setLoading(true);
@@ -468,8 +474,12 @@ export default function PartnerPortal({ profile, onLogout }) {
           },
           body: JSON.stringify({ promotorId: inserted.id, email: trimmedEmail, fullName: trimmedName }),
         });
-        if (!res.ok) {
-          const data = await res.json().catch(() => ({}));
+        const data = await res.json().catch(() => ({}));
+        if (res.ok) {
+          if (data?.tempPassword) {
+            setRecruitCredentials({ email: trimmedEmail, tempPassword: data.tempPassword });
+          }
+        } else {
           console.warn("create-promotor-login failed:", data.error || res.status);
         }
       } catch (e) {
@@ -1537,7 +1547,7 @@ export default function PartnerPortal({ profile, onLogout }) {
               }}
             >
               <button
-                onClick={() => { setShowRecruitForm(true); setRecruitError(""); }}
+                onClick={() => { setShowRecruitForm(true); setRecruitError(""); setRecruitCredentials(null); }}
                 style={{
                   padding: "8px 18px",
                   borderRadius: 8,
@@ -2055,6 +2065,52 @@ export default function PartnerPortal({ profile, onLogout }) {
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {recruitCredentials && (
+        <div
+          onClick={(e) => { if (e.target === e.currentTarget) setRecruitCredentials(null); }}
+          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.65)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 210, padding: 24 }}
+        >
+          <div style={{ background: "#0b1739", border: "1px solid rgba(50,80,140,0.4)", borderRadius: 18, padding: "32px 28px", width: "100%", maxWidth: 440, boxShadow: "0 8px 40px rgba(0,0,0,0.5)" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
+              <h2 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: "#ffffff" }}>Promotor Created Successfully</h2>
+              <button
+                onClick={() => setRecruitCredentials(null)}
+                style={{ background: "none", border: "none", color: "#4a7090", fontSize: 20, cursor: "pointer", lineHeight: 1, padding: "0 4px" }}
+              >✕</button>
+            </div>
+
+            <p style={{ fontSize: 13, color: "#7ab0cc", marginTop: 0, marginBottom: 18 }}>
+              Share these one-time login credentials with the promotor. They will not be shown again.
+            </p>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 18 }}>
+              <div>
+                <label style={{ fontSize: 11, fontWeight: 700, color: "#4a7090", letterSpacing: "0.08em", display: "block", marginBottom: 5 }}>EMAIL</label>
+                <div style={{ ...inputStyle, display: "flex", alignItems: "center" }}>{recruitCredentials.email}</div>
+              </div>
+              <div>
+                <label style={{ fontSize: 11, fontWeight: 700, color: "#4a7090", letterSpacing: "0.08em", display: "block", marginBottom: 5 }}>TEMPORARY PASSWORD</label>
+                <div style={{ ...inputStyle, display: "flex", alignItems: "center", fontFamily: "monospace" }}>{recruitCredentials.tempPassword}</div>
+              </div>
+            </div>
+
+            <button
+              onClick={() => {
+                const text = `Email: ${recruitCredentials.email}\nPassword: ${recruitCredentials.tempPassword}`;
+                navigator.clipboard?.writeText(text).catch((e) => console.warn("copy credentials failed:", e));
+              }}
+              style={{
+                width: "100%", padding: "12px 0", borderRadius: 10, border: "none",
+                background: "linear-gradient(135deg, #3a9ad9, #2a7ab8)",
+                color: "white", fontSize: 14, fontWeight: 700, cursor: "pointer",
+              }}
+            >
+              Copy Credentials
+            </button>
           </div>
         </div>
       )}

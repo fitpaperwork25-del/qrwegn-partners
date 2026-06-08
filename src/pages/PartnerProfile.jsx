@@ -124,7 +124,8 @@ export default function PartnerProfile({ partnerId, navigate }) {
       .select("id")
       .eq("partner_id", partnerId)
       .maybeSingle()
-      .then(({ data }) => setPartnerLoginExists(!!data));
+      .then(({ data, error }) => setPartnerLoginExists(!error && !!data))
+      .catch(() => setPartnerLoginExists(false));
   }, [partnerId]);
 
   const loadComms = async () => {

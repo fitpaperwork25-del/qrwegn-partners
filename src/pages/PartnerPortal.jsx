@@ -510,7 +510,7 @@ export default function PartnerPortal({ profile, onLogout }) {
             recipient_email: trimmedEmail,
             notification_type: "promotor_onboarding",
             subject: "Welcome to QR-Wegn Partners",
-            body: `Hi ${trimmedName}, welcome to QR-Wegn Partners! Your account is being set up and you'll receive your login details shortly.`,
+            body: `Hi ${trimmedName}, welcome to QR-Wegn Partners! Your account has been created. Your partner will provide your login credentials.`,
             status: "pending",
           },
         ]);

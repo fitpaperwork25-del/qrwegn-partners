@@ -10,16 +10,40 @@ const ADMIN_EMAIL = "info@qrwegn.com";
 export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).end();
 
-  // Verify caller is the super-admin
+  // Identify the caller
   const token = (req.headers.authorization || "").replace("Bearer ", "");
   const { data: { user }, error: authErr } = await supabaseAdmin.auth.getUser(token);
-  if (authErr || user?.email !== ADMIN_EMAIL) {
+  if (authErr || !user) {
     return res.status(403).json({ error: "Forbidden" });
   }
 
   const { promotorId, email, fullName } = req.body;
   if (!promotorId || !email) {
     return res.status(400).json({ error: "promotorId and email are required." });
+  }
+
+  // Authorize: super-admin, or the partner who owns this promotor
+  if (user.email !== ADMIN_EMAIL) {
+    const { data: callerProfile } = await supabaseAdmin
+      .from("profiles")
+      .select("role, partner_id")
+      .eq("id", user.id)
+      .single();
+
+    const { data: promotorRow } = await supabaseAdmin
+      .from("promotors")
+      .select("partner_id")
+      .eq("id", promotorId)
+      .single();
+
+    const isOwningPartner =
+      callerProfile?.role === "partner" &&
+      callerProfile?.partner_id &&
+      callerProfile.partner_id === promotorRow?.partner_id;
+
+    if (!isOwningPartner) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
   }
 
   // Duplicate check — profile already linked to this promotor

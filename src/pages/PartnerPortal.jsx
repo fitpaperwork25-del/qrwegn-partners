@@ -434,23 +434,47 @@ export default function PartnerPortal({ profile, onLogout }) {
       return;
     }
 
-    const { error } = await supabase.from("promotors").insert({
+    const trimmedEmail = recruitForm.email.trim();
+    const trimmedName = recruitForm.full_name.trim();
+
+    const { data: inserted, error } = await supabase.from("promotors").insert({
       partner_id: profileRow.partner_id,
-      full_name: recruitForm.full_name.trim(),
-      email: recruitForm.email.trim() || null,
+      full_name: trimmedName,
+      email: trimmedEmail || null,
       phone: recruitForm.phone.trim() || null,
       country: recruitForm.country.trim() || null,
       languages: recruitForm.languages.trim() || null,
       notes: recruitForm.notes.trim() || null,
       type: recruitForm.type || "individual",
       status: "active",
-    });
+    }).select("id").single();
 
     setRecruitSaving(false);
 
     if (error) {
       setRecruitError(error.message || "Failed to add promotor.");
       return;
+    }
+
+    // Best-effort: create the promotor's login automatically. Never blocks success.
+    if (trimmedEmail && inserted?.id) {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        const res = await fetch("/api/create-promotor-login", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${session?.access_token}`,
+          },
+          body: JSON.stringify({ promotorId: inserted.id, email: trimmedEmail, fullName: trimmedName }),
+        });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          console.warn("create-promotor-login failed:", data.error || res.status);
+        }
+      } catch (e) {
+        console.warn("create-promotor-login request failed:", e);
+      }
     }
 
     setRecruitForm({

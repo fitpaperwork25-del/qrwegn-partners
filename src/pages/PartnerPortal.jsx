@@ -225,6 +225,7 @@ export default function PartnerPortal({ profile, onLogout }) {
   const [showRecruitForm, setShowRecruitForm] = useState(false);
   const [recruitCredentials, setRecruitCredentials] = useState(null);
   const [loginSetupNotice, setLoginSetupNotice] = useState("");
+  const [removePromotorError, setRemovePromotorError] = useState("");
   const [myLeads, setMyLeads] = useState([]);
   const [myPayouts, setMyPayouts] = useState([]);
   const [demoLinks, setDemoLinks] = useState([]);
@@ -393,8 +394,26 @@ export default function PartnerPortal({ profile, onLogout }) {
       .from("promotors")
       .select("*")
       .eq("partner_id", id)
+      .neq("status", "removed")
       .order("created_at", { ascending: false });
     if (!error) setPromotors(data || []);
+  };
+
+  const handleRemovePromotor = async (promotor) => {
+    if (!window.confirm(`Remove ${promotor.full_name || "this promotor"} from your promotors list?`)) {
+      return;
+    }
+    setRemovePromotorError("");
+    const { error } = await supabase
+      .from("promotors")
+      .update({ status: "removed" })
+      .eq("id", promotor.id);
+
+    if (error) {
+      setRemovePromotorError(error.message || "Failed to remove promotor.");
+      return;
+    }
+    loadPromotors();
   };
 
   const loadCommissionTxns = async (pid) => {
@@ -1587,6 +1606,22 @@ export default function PartnerPortal({ profile, onLogout }) {
             )}
 
 
+            {removePromotorError && (
+              <div
+                style={{
+                  background: "rgba(220,60,60,0.08)",
+                  border: "1px solid rgba(220,60,60,0.25)",
+                  borderRadius: 10,
+                  padding: "12px 16px",
+                  marginBottom: 16,
+                  fontSize: 13,
+                  color: "#e05a5a",
+                }}
+              >
+                {removePromotorError}
+              </div>
+            )}
+
             {promotors.length === 0 ? (
               <Card style={{ textAlign: "center", padding: "52px 24px" }}>
                 <div style={{ fontSize: 36, marginBottom: 14 }}>👥</div>
@@ -1616,13 +1651,38 @@ export default function PartnerPortal({ profile, onLogout }) {
                   <Card key={promotor.id}>
                     <div
                       style={{
-                        fontSize: 15,
-                        fontWeight: 800,
-                        color: "#c0d8e8",
-                        marginBottom: 4,
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "flex-start",
+                        gap: 8,
                       }}
                     >
-                      {promotor.full_name || "Unnamed Promotor"}
+                      <div
+                        style={{
+                          fontSize: 15,
+                          fontWeight: 800,
+                          color: "#c0d8e8",
+                          marginBottom: 4,
+                        }}
+                      >
+                        {promotor.full_name || "Unnamed Promotor"}
+                      </div>
+                      <button
+                        onClick={() => handleRemovePromotor(promotor)}
+                        style={{
+                          padding: "2px 8px",
+                          borderRadius: 6,
+                          border: "1px solid rgba(220,60,60,0.3)",
+                          cursor: "pointer",
+                          background: "transparent",
+                          color: "#e05a5a",
+                          fontSize: 11,
+                          fontWeight: 700,
+                          flexShrink: 0,
+                        }}
+                      >
+                        Remove
+                      </button>
                     </div>
                     <div style={{ fontSize: 13, color: "#4a7090" }}>
                       {promotor.country || "No country listed"}

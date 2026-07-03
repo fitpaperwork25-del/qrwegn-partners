@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
 import { supabase } from "../lib/supabase";
+import { useSupabaseQuery } from "../hooks/useSupabaseQuery";
 import { Card } from "./AdminDashboard";
 
 const EARN = ["signed", "active"];
@@ -10,26 +10,29 @@ const fmtDate = (iso) => {
 };
 
 export default function CommissionsPage() {
-  const [partners,  setPartners]  = useState([]);
-  const [promotors, setPromotors] = useState([]);
-  const [leads,     setLeads]     = useState([]);
-  const [payouts,   setPayouts]   = useState([]);
-  const [loading,   setLoading]   = useState(true);
-
-  useEffect(() => {
-    Promise.all([
+  const { data, loading, error } = useSupabaseQuery(async () => {
+    const [pRes, prRes, lRes, payRes] = await Promise.all([
       supabase.from("partners").select("id, full_name"),
       supabase.from("promotors").select("id, full_name"),
       supabase.from("leads").select("id, status, monthly_value, currency, promotor_pct, partner_pct, submitted_by_promotor_id, regional_partner_id"),
       supabase.from("payouts").select("*").order("paid_on", { ascending: false }),
-    ]).then(([pRes, prRes, lRes, payRes]) => {
-      if (!pRes.error)   setPartners(pRes.data   || []);
-      if (!prRes.error)  setPromotors(prRes.data  || []);
-      if (!lRes.error)   setLeads(lRes.data       || []);
-      if (!payRes.error) setPayouts(payRes.data   || []);
-      setLoading(false);
-    });
+    ]);
+    if (pRes.error) throw pRes.error;
+    if (prRes.error) throw prRes.error;
+    if (lRes.error) throw lRes.error;
+    if (payRes.error) throw payRes.error;
+    return {
+      partners: pRes.data || [],
+      promotors: prRes.data || [],
+      leads: lRes.data || [],
+      payouts: payRes.data || [],
+    };
   }, []);
+
+  const partners = data?.partners || [];
+  const promotors = data?.promotors || [];
+  const leads = data?.leads || [];
+  const payouts = data?.payouts || [];
 
   // ── Same earnings calculation as AdminDashboard ─────────────────────────
   const map = {};
@@ -81,6 +84,12 @@ export default function CommissionsPage() {
 
   if (loading) return (
     <div style={{ textAlign: "center", padding: "80px 0", color: "#a0c8e8", fontSize: 16 }}>Loading commissions…</div>
+  );
+
+  if (error) return (
+    <div style={{ textAlign: "center", padding: "80px 0", color: "#f07070", fontSize: 16 }}>
+      Could not load commissions. {error.message}
+    </div>
   );
 
   return (

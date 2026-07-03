@@ -1,5 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { supabase } from "../lib/supabase";
+import { useSupabaseQuery } from "../hooks/useSupabaseQuery";
 import { STAGE_COLORS, STAGES, StageBadge, Card } from "./AdminDashboard";
 
 const EMPTY_FORM = {
@@ -9,8 +10,6 @@ const EMPTY_FORM = {
 };
 
 export default function PartnersPage({ navigate }) {
-  const [partners, setPartners] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [view, setView] = useState("list");
   const [filterStage, setFilterStage] = useState("All");
   const [search, setSearch] = useState("");
@@ -19,17 +18,16 @@ export default function PartnersPage({ navigate }) {
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState("");
 
-  const loadPartners = async () => {
-    setLoading(true);
+  const { data, loading, error, refetch } = useSupabaseQuery(async () => {
     const { data, error } = await supabase
       .from("partners")
       .select("*")
       .order("created_at", { ascending: false });
-    if (!error) setPartners(data || []);
-    setLoading(false);
-  };
+    if (error) throw error;
+    return data || [];
+  }, []);
 
-  useEffect(() => { loadPartners(); }, []);
+  const partners = data || [];
 
   const handleSave = async () => {
     if (!form.full_name.trim()) { setFormError("Full name is required."); return; }
@@ -57,7 +55,7 @@ export default function PartnersPage({ navigate }) {
     if (error) { setFormError(error.message); return; }
     setShowModal(false);
     setForm(EMPTY_FORM);
-    loadPartners();
+    refetch();
   };
 
   // Promotor hierarchy
@@ -136,6 +134,10 @@ export default function PartnersPage({ navigate }) {
 
       {loading ? (
         <div style={{ textAlign: "center", padding: "60px 0", color: "#a0c8e8", fontSize: 18 }}>Loading partners...</div>
+      ) : error ? (
+        <div style={{ textAlign: "center", padding: "60px 0", color: "#f07070", fontSize: 18 }}>
+          Could not load partners. {error.message}
+        </div>
       ) : view === "list" ? (
         <Card style={{ padding: 0, overflow: "hidden" }}>
           <table style={{ width: "100%", borderCollapse: "collapse" }}>

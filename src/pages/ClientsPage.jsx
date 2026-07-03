@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
 import { supabase } from "../lib/supabase";
+import { useSupabaseQuery } from "../hooks/useSupabaseQuery";
 import { Card } from "./AdminDashboard";
 
 const fmtDate = (iso) => {
@@ -8,20 +8,17 @@ const fmtDate = (iso) => {
 };
 
 export default function ClientsPage() {
-  const [clients, setClients] = useState([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    supabase
+  const { data, loading, error } = useSupabaseQuery(async () => {
+    const { data, error } = await supabase
       .from("leads")
       .select("*, submitted_by_partner:partners!leads_submitted_by_partner_id_fkey(full_name)")
       .in("status", ["signed", "active"])
-      .order("created_at", { ascending: false })
-      .then(({ data, error }) => {
-        if (!error) setClients(data || []);
-        setLoading(false);
-      });
+      .order("created_at", { ascending: false });
+    if (error) throw error;
+    return data || [];
   }, []);
+
+  const clients = data || [];
 
   const mrr = clients
     .filter((c) => c.monthly_value)
@@ -29,6 +26,12 @@ export default function ClientsPage() {
 
   if (loading) return (
     <div style={{ textAlign: "center", padding: "80px 0", color: "#a0c8e8", fontSize: 16 }}>Loading clients…</div>
+  );
+
+  if (error) return (
+    <div style={{ textAlign: "center", padding: "80px 0", color: "#f07070", fontSize: 16 }}>
+      Could not load clients. {error.message}
+    </div>
   );
 
   return (

@@ -1,5 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { supabase } from "../lib/supabase";
+import { useSupabaseQuery } from "../hooks/useSupabaseQuery";
 import { Card, StageBadge, STAGE_COLORS } from "./AdminDashboard";
 
 const LEAD_STATUS_COLORS = {
@@ -18,25 +19,24 @@ const fmtDate = (iso) => {
 };
 
 export default function LeadsPage({ navigate }) {
-  const [leads,     setLeads]     = useState([]);
-  const [promotors, setPromotors] = useState([]);
-  const [loading,   setLoading]   = useState(true);
-  const [search,    setSearch]    = useState("");
-  const [filter,    setFilter]    = useState("all");
+  const [search, setSearch] = useState("");
+  const [filter, setFilter] = useState("all");
 
-  useEffect(() => {
-    Promise.all([
+  const { data, loading, error } = useSupabaseQuery(async () => {
+    const [lRes, prRes] = await Promise.all([
       supabase
         .from("leads")
         .select("*, submitted_by_partner:partners!leads_submitted_by_partner_id_fkey(full_name)")
         .order("created_at", { ascending: false }),
       supabase.from("promotors").select("id, full_name"),
-    ]).then(([lRes, prRes]) => {
-      if (!lRes.error)  setLeads(lRes.data   || []);
-      if (!prRes.error) setPromotors(prRes.data || []);
-      setLoading(false);
-    });
+    ]);
+    if (lRes.error) throw lRes.error;
+    if (prRes.error) throw prRes.error;
+    return { leads: lRes.data || [], promotors: prRes.data || [] };
   }, []);
+
+  const leads = data?.leads || [];
+  const promotors = data?.promotors || [];
 
   const filtered = leads.filter((l) => {
     const matchStatus = filter === "all" || (l.status || "new") === filter;
@@ -58,6 +58,12 @@ export default function LeadsPage({ navigate }) {
 
   if (loading) return (
     <div style={{ textAlign: "center", padding: "80px 0", color: "#a0c8e8", fontSize: 16 }}>Loading leads…</div>
+  );
+
+  if (error) return (
+    <div style={{ textAlign: "center", padding: "80px 0", color: "#f07070", fontSize: 16 }}>
+      Could not load leads. {error.message}
+    </div>
   );
 
   return (

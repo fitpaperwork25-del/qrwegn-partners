@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabase";
+import { useSupabaseQuery } from "../hooks/useSupabaseQuery";
 
 // ── Brand ──────────────────────────────────────────────────────────────────
 const NAVY = "#0B1739";
@@ -57,32 +57,33 @@ const sectionLabel = {
 
 // ── Data sources — untouched ───────────────────────────────────────────────
 export default function LightDashboard({ navigate, onLogout, profile }) {
-  const [partners,  setPartners]  = useState([]);
-  const [leads,     setLeads]     = useState([]);
-  const [promotors, setPromotors] = useState([]);
-  const [loading,   setLoading]   = useState(true);
-
   const hour      = new Date().getHours();
   const greeting  = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
   const firstName = profile?.full_name?.split(" ")[0] || "there";
   const today     = new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
 
-  useEffect(() => {
-    (async () => {
-      const [pRes, lRes, prRes] = await Promise.all([
-        supabase.from("partners").select("*").order("created_at", { ascending: false }),
-        supabase
-          .from("leads")
-          .select("*, submitted_by_partner:partners!leads_submitted_by_partner_id_fkey(full_name)")
-          .order("created_at", { ascending: false }),
-        supabase.from("promotors").select("*"),
-      ]);
-      if (!pRes.error)  setPartners(pRes.data  || []);
-      if (!lRes.error)  setLeads(lRes.data     || []);
-      if (!prRes.error) setPromotors(prRes.data || []);
-      setLoading(false);
-    })();
+  const { data, loading, error } = useSupabaseQuery(async () => {
+    const [pRes, lRes, prRes] = await Promise.all([
+      supabase.from("partners").select("*").order("created_at", { ascending: false }),
+      supabase
+        .from("leads")
+        .select("*, submitted_by_partner:partners!leads_submitted_by_partner_id_fkey(full_name)")
+        .order("created_at", { ascending: false }),
+      supabase.from("promotors").select("*"),
+    ]);
+    if (pRes.error) throw pRes.error;
+    if (lRes.error) throw lRes.error;
+    if (prRes.error) throw prRes.error;
+    return {
+      partners: pRes.data || [],
+      leads: lRes.data || [],
+      promotors: prRes.data || [],
+    };
   }, []);
+
+  const partners = data?.partners || [];
+  const leads = data?.leads || [];
+  const promotors = data?.promotors || [];
 
   // ── Metrics (no logic changes) ─────────────────────────────────────────
   const earnLeads   = leads.filter((l) => EARN.includes(l.status));
@@ -111,6 +112,14 @@ export default function LightDashboard({ navigate, onLogout, profile }) {
     return (
       <div style={{ display: "flex", height: "100vh", alignItems: "center", justifyContent: "center", background: "#f8fafc" }}>
         <div style={{ fontSize: 16, color: "#374151" }}>Loading…</div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div style={{ display: "flex", height: "100vh", alignItems: "center", justifyContent: "center", background: "#f8fafc" }}>
+        <div style={{ fontSize: 16, color: "#b91c1c" }}>Could not load dashboard. {error.message}</div>
       </div>
     );
   }

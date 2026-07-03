@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabase";
+import { useSupabaseQuery } from "../hooks/useSupabaseQuery";
 
 const NAVY = "#0B1739";
 const GOLD = "#E8C547";
@@ -42,23 +42,25 @@ const label = {
 };
 
 export default function AnalyticsPage({ navigate }) {
-  const [leads,     setLeads]     = useState([]);
-  const [partners,  setPartners]  = useState([]);
-  const [promotors, setPromotors] = useState([]);
-  const [loading,   setLoading]   = useState(true);
-
-  useEffect(() => {
-    Promise.all([
+  const { data, loading, error } = useSupabaseQuery(async () => {
+    const [lRes, pRes, prRes] = await Promise.all([
       supabase.from("leads").select("id, status, monthly_value, currency, partner_pct, country, created_at").order("created_at", { ascending: false }),
       supabase.from("partners").select("id, full_name"),
       supabase.from("promotors").select("id, full_name"),
-    ]).then(([lRes, pRes, prRes]) => {
-      if (!lRes.error)  setLeads(lRes.data   || []);
-      if (!pRes.error)  setPartners(pRes.data || []);
-      if (!prRes.error) setPromotors(prRes.data || []);
-      setLoading(false);
-    });
+    ]);
+    if (lRes.error) throw lRes.error;
+    if (pRes.error) throw pRes.error;
+    if (prRes.error) throw prRes.error;
+    return {
+      leads: lRes.data || [],
+      partners: pRes.data || [],
+      promotors: prRes.data || [],
+    };
   }, []);
+
+  const leads = data?.leads || [];
+  const partners = data?.partners || [];
+  const promotors = data?.promotors || [];
 
   const earnLeads   = leads.filter((l) => EARN.includes(l.status));
   const signed      = leads.filter((l) => l.status === "signed").length;
@@ -83,6 +85,14 @@ export default function AnalyticsPage({ navigate }) {
     return (
       <div style={{ minHeight: "100vh", background: "#f8fafc", display: "flex", alignItems: "center", justifyContent: "center" }}>
         <span style={{ fontSize: 16, color: "#374151" }}>Loading…</span>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div style={{ minHeight: "100vh", background: "#f8fafc", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <span style={{ fontSize: 16, color: "#b91c1c" }}>Could not load analytics. {error.message}</span>
       </div>
     );
   }

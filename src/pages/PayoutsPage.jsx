@@ -1,5 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { supabase } from "../lib/supabase";
+import { useSupabaseQuery } from "../hooks/useSupabaseQuery";
 import { Card } from "./AdminDashboard";
 
 const TODAY = new Date().toISOString().slice(0, 10);
@@ -10,29 +11,28 @@ const fmtDate = (iso) => {
 };
 
 export default function PayoutsPage() {
-  const [payouts,   setPayouts]   = useState([]);
-  const [partners,  setPartners]  = useState([]);
-  const [promotors, setPromotors] = useState([]);
-  const [loading,   setLoading]   = useState(true);
-  const [form,      setForm]      = useState({ beneficiary: "", beneficiary_type: "", beneficiary_id: "", amount: "", currency: "USD", paid_on: TODAY, note: "" });
-  const [saving,    setSaving]    = useState(false);
+  const [form, setForm] = useState({ beneficiary: "", beneficiary_type: "", beneficiary_id: "", amount: "", currency: "USD", paid_on: TODAY, note: "" });
+  const [saving, setSaving] = useState(false);
 
-  const fetchPayouts = () =>
-    supabase.from("payouts").select("*").order("paid_on", { ascending: false })
-      .then(({ data, error }) => { if (!error) setPayouts(data || []); });
-
-  useEffect(() => {
-    Promise.all([
+  const { data, loading, error, refetch } = useSupabaseQuery(async () => {
+    const [payRes, pRes, prRes] = await Promise.all([
       supabase.from("payouts").select("*").order("paid_on", { ascending: false }),
       supabase.from("partners").select("id, full_name"),
       supabase.from("promotors").select("id, full_name"),
-    ]).then(([payRes, pRes, prRes]) => {
-      if (!payRes.error) setPayouts(payRes.data  || []);
-      if (!pRes.error)   setPartners(pRes.data   || []);
-      if (!prRes.error)  setPromotors(prRes.data || []);
-      setLoading(false);
-    });
+    ]);
+    if (payRes.error) throw payRes.error;
+    if (pRes.error) throw pRes.error;
+    if (prRes.error) throw prRes.error;
+    return {
+      payouts: payRes.data || [],
+      partners: pRes.data || [],
+      promotors: prRes.data || [],
+    };
   }, []);
+
+  const payouts = data?.payouts || [];
+  const partners = data?.partners || [];
+  const promotors = data?.promotors || [];
 
   const recordPayout = async () => {
     if (!form.beneficiary_id || !form.amount) return;
@@ -47,7 +47,7 @@ export default function PayoutsPage() {
       note: form.note.trim() || null,
     });
     if (!error) {
-      await fetchPayouts();
+      refetch();
       setForm({ beneficiary: "", beneficiary_type: "", beneficiary_id: "", amount: "", currency: "USD", paid_on: TODAY, note: "" });
     }
     setSaving(false);
@@ -56,7 +56,7 @@ export default function PayoutsPage() {
   const deletePayout = async (id) => {
     if (!window.confirm("Delete this payout?")) return;
     const { error } = await supabase.from("payouts").delete().eq("id", id);
-    if (!error) await fetchPayouts();
+    if (!error) refetch();
   };
 
   const totalPaid = payouts.reduce((s, p) => s + Number(p.amount), 0);
@@ -65,6 +65,12 @@ export default function PayoutsPage() {
 
   if (loading) return (
     <div style={{ textAlign: "center", padding: "80px 0", color: "#a0c8e8", fontSize: 16 }}>Loading payouts…</div>
+  );
+
+  if (error) return (
+    <div style={{ textAlign: "center", padding: "80px 0", color: "#f07070", fontSize: 16 }}>
+      Could not load payouts. {error.message}
+    </div>
   );
 
   return (

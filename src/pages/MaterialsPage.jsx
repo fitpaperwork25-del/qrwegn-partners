@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { supabase } from "../lib/supabase";
+import { useSupabaseQuery } from "../hooks/useSupabaseQuery";
 
 const BUCKET = "partner-materials";
 
@@ -11,31 +12,21 @@ const emptyForm = {
 };
 
 export default function MaterialsPage() {
-  const [materials, setMaterials] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
-  useEffect(() => {
-    loadMaterials();
-  }, []);
-
-  const loadMaterials = async () => {
-    setLoading(true);
-
+  const { data, loading, error: loadError, refetch } = useSupabaseQuery(async () => {
     const { data, error } = await supabase
       .from("sales_materials")
       .select("*")
       .order("created_at", { ascending: false });
+    if (error) throw error;
+    return data || [];
+  }, []);
 
-    if (!error && data) {
-      setMaterials(data);
-    }
-
-    setLoading(false);
-  };
+  const materials = data || [];
 
   const set = (key, val) => {
     setForm((f) => ({ ...f, [key]: val }));
@@ -118,7 +109,7 @@ export default function MaterialsPage() {
     setSaving(false);
     setModalOpen(false);
     setForm(emptyForm);
-    loadMaterials();
+    refetch();
   };
 
   const handleDelete = async (id, title) => {
@@ -134,7 +125,7 @@ export default function MaterialsPage() {
       return;
     }
 
-    loadMaterials();
+    refetch();
   };
 
   const typeIcon = (type) => {
@@ -148,6 +139,10 @@ export default function MaterialsPage() {
 
   if (loading) {
     return <div style={s.page}>Loading materials...</div>;
+  }
+
+  if (loadError) {
+    return <div style={s.page}>Could not load materials. {loadError.message}</div>;
   }
 
   return (

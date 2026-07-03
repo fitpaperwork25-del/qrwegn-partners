@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "vitest run"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.106.1",
@@ -17,7 +18,10 @@
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
+    "@testing-library/react": "^16.3.2",
     "@vitejs/plugin-react": "^4.3.1",
-    "vite": "^5.4.2"
+    "jsdom": "^29.1.1",
+    "vite": "^5.4.2",
+    "vitest": "^4.1.9"
   }
 }

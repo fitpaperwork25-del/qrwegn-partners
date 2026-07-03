@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
 import * as XLSX from "xlsx";
 import { supabase } from "../lib/supabase";
+import { useSupabaseQuery } from "../hooks/useSupabaseQuery";
 
 const NAVY = "#0B1739";
 const GOLD = "#E8C547";
@@ -74,16 +74,9 @@ const sectionLabel = { fontSize: 13, fontWeight: 700, letterSpacing: "0.1em", te
 
 // ── Component ──────────────────────────────────────────────────────────────
 export default function ReportsPage({ navigate }) {
-  const [leads,     setLeads]     = useState([]);
-  const [payouts,   setPayouts]   = useState([]);
-  const [partners,  setPartners]  = useState([]);
-  const [promotors, setPromotors] = useState([]);
-  const [commTxns,  setCommTxns]  = useState([]);
-  const [loading,   setLoading]   = useState(true);
-
-  useEffect(() => {
-    Promise.all([
-      // Added business_name to leads select for commission_transactions drill-down
+  const { data, loading, error } = useSupabaseQuery(async () => {
+    // Added business_name to leads select for commission_transactions drill-down
+    const [lRes, payRes, pRes, prRes, txRes] = await Promise.all([
       supabase.from("leads")
         .select("id, business_name, status, monthly_value, currency, partner_pct, promotor_pct, submitted_by_promotor_id, regional_partner_id")
         .order("created_at", { ascending: false }),
@@ -91,15 +84,26 @@ export default function ReportsPage({ navigate }) {
       supabase.from("partners").select("id, full_name"),
       supabase.from("promotors").select("id, full_name"),
       supabase.from("commission_transactions").select("*").order("created_at", { ascending: false }),
-    ]).then(([lRes, payRes, pRes, prRes, txRes]) => {
-      if (!lRes.error)   setLeads(lRes.data    || []);
-      if (!payRes.error) setPayouts(payRes.data || []);
-      if (!pRes.error)   setPartners(pRes.data  || []);
-      if (!prRes.error)  setPromotors(prRes.data || []);
-      if (!txRes.error)  setCommTxns(txRes.data  || []);
-      setLoading(false);
-    });
+    ]);
+    if (lRes.error) throw lRes.error;
+    if (payRes.error) throw payRes.error;
+    if (pRes.error) throw pRes.error;
+    if (prRes.error) throw prRes.error;
+    if (txRes.error) throw txRes.error;
+    return {
+      leads: lRes.data || [],
+      payouts: payRes.data || [],
+      partners: pRes.data || [],
+      promotors: prRes.data || [],
+      commTxns: txRes.data || [],
+    };
   }, []);
+
+  const leads = data?.leads || [];
+  const payouts = data?.payouts || [];
+  const partners = data?.partners || [];
+  const promotors = data?.promotors || [];
+  const commTxns = data?.commTxns || [];
 
   // ── Commission summary (unchanged logic) ─────────────────────────────────
   const commMap = {};
@@ -235,6 +239,14 @@ export default function ReportsPage({ navigate }) {
     return (
       <div style={{ minHeight: "100vh", background: "#f8fafc", display: "flex", alignItems: "center", justifyContent: "center" }}>
         <span style={{ fontSize: 16, color: "#374151" }}>Loading…</span>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div style={{ minHeight: "100vh", background: "#f8fafc", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <span style={{ fontSize: 16, color: "#b91c1c" }}>Could not load reports. {error.message}</span>
       </div>
     );
   }

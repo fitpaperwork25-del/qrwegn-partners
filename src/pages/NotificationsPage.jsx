@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { supabase } from "../lib/supabase";
+import { useSupabaseQuery } from "../hooks/useSupabaseQuery";
 
 const STATUS_COLORS = {
   pending: { color: "#f0c040", bg: "rgba(240,180,60,0.14)" },
@@ -44,26 +45,29 @@ const emptyForm = {
 };
 
 export default function NotificationsPage() {
-  const [logs,        setLogs]        = useState([]);
-  const [loading,     setLoading]     = useState(true);
   const [form,        setForm]        = useState(emptyForm);
   const [saving,      setSaving]      = useState(false);
   const [insertError, setInsertError] = useState("");
   const [trigger,     setTrigger]     = useState({ loading: false, result: null });
   const [filter,      setFilter]      = useState("all");
 
-  const load = async () => {
-    setLoading(true);
+  const { data, loading, error: loadError, refetch } = useSupabaseQuery(async () => {
     const { data, error } = await supabase
       .from("notification_logs")
       .select("*")
       .order("created_at", { ascending: false })
       .limit(200);
-    if (!error && data) setLogs(data);
-    setLoading(false);
-  };
+    if (error) throw error;
+    return data || [];
+  }, []);
 
-  useEffect(() => { load(); }, []);
+  // logs derives directly from the hook's own data — no parallel
+  // effect/state to fall out of sync. Instant delete (matching the
+  // original behavior) is preserved by filtering out locally-deleted
+  // ids at render time instead of maintaining a separate copy of the
+  // list.
+  const [deletedIds, setDeletedIds] = useState(new Set());
+  const logs = (data || []).filter(l => !deletedIds.has(l.id));
 
   const counts = {
     all:     logs.length,
@@ -88,7 +92,7 @@ export default function NotificationsPage() {
     });
     if (!error) {
       setForm(emptyForm);
-      await load();
+      refetch();
     } else {
       console.error("createNotification error:", error);
       setInsertError(error.message || "Insert failed — check console for details.");
@@ -99,18 +103,18 @@ export default function NotificationsPage() {
   const deleteLog = async (id) => {
     if (!window.confirm("Delete this notification log entry?")) return;
     await supabase.from("notification_logs").delete().eq("id", id);
-    setLogs(ls => ls.filter(l => l.id !== id));
+    setDeletedIds(prev => new Set(prev).add(id));
   };
 
   const triggerSend = async () => {
     setTrigger({ loading: true, result: null });
     try {
-      const { data, error } = await supabase.functions.invoke("send-pending-notifications");
-      setTrigger({ loading: false, result: error ? `Error: ${error.message}` : `Sent: ${data?.sent ?? 0}  Failed: ${data?.failed ?? 0}` });
+      const { data: sendResult, error } = await supabase.functions.invoke("send-pending-notifications");
+      setTrigger({ loading: false, result: error ? `Error: ${error.message}` : `Sent: ${sendResult?.sent ?? 0}  Failed: ${sendResult?.failed ?? 0}` });
     } catch (e) {
       setTrigger({ loading: false, result: `Error: ${e.message}` });
     }
-    await load();
+    refetch();
   };
 
   return (
@@ -228,6 +232,10 @@ export default function NotificationsPage() {
 
         {loading ? (
           <p style={{ textAlign: "center", color: "#7ab0cc", padding: "32px 0" }}>Loading…</p>
+        ) : loadError ? (
+          <p style={{ textAlign: "center", color: "#f07070", padding: "32px 0" }}>
+            Could not load notifications. {loadError.message}
+          </p>
         ) : visible.length === 0 ? (
           <p style={{ textAlign: "center", color: "#5a7a90", padding: "32px 0" }}>No notifications yet.</p>
         ) : (

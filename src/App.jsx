@@ -12,6 +12,7 @@ import ReportsPage from "./pages/ReportsPage";
 import NotificationsPage from "./pages/NotificationsPage";
 import MaterialsPage from "./pages/MaterialsPage";
 import PartnersPage from "./pages/PartnersPage";
+import PartnerProfile from "./pages/PartnerProfile";
 import TrainingPage from "./pages/TrainingPage";
 
 function PortalApp() {
@@ -39,6 +40,7 @@ function PortalApp() {
   // (commit dd7b17b) so admin navigation reaches the real pages again,
   // instead of the no-op stub from the earlier routing-only restoration.
   const [page, setPage] = useState("dashboard");
+  const [selectedPartnerId, setSelectedPartnerId] = useState(null);
 
   // fetch profile role (single source of truth)
   const fetchProfile = async (userId) => {
@@ -168,10 +170,9 @@ function PortalApp() {
     }
   };
 
-  // Real admin navigation — replaces the earlier no-op stub. Only
-  // handles a plain page switch for now; Partners/Partner Profile
-  // (which used a partnerId param) are not part of this restoration.
-  const navigate = (to) => {
+  // Real admin navigation — replaces the earlier no-op stub.
+  const navigate = (to, params) => {
+    if (params?.partnerId) setSelectedPartnerId(params.partnerId);
     setPage(to);
   };
 
@@ -272,6 +273,7 @@ function PortalApp() {
       <AdminLayout page={page} navigate={navigate} onLogout={logout} profile={profile}>
         {page === "leads" && <LeadsPage navigate={navigate} />}
         {page === "partners" && <PartnersPage navigate={navigate} />}
+        {page === "partner-profile" && <PartnerProfile partnerId={selectedPartnerId} navigate={navigate} />}
         {page === "clients" && <ClientsPage />}
         {page === "commissions" && <CommissionsPage />}
         {page === "payouts" && <PayoutsPage />}

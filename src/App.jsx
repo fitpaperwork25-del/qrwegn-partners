@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "./lib/supabase";
+import AdminDashboard from "./pages/AdminDashboard";
 
 function PortalApp() {
   const [user, setUser] = useState(null);
@@ -11,11 +12,13 @@ function PortalApp() {
 
   // fetch profile role (single source of truth)
   const fetchProfile = async (userId) => {
-    const { data, error } = await supabase
+    const { data, error, status, statusText } = await supabase
       .from("profiles")
       .select("role")
       .eq("id", userId)
       .single();
+
+    console.log("[PROFILE FETCH]", { userId, data, error, status, statusText });
 
     if (error || !data) {
       console.log("profile fetch error:", error);
@@ -27,18 +30,29 @@ function PortalApp() {
 
   // init session restore
   useEffect(() => {
-    const init = async () => {
-      const { data } = await supabase.auth.getSession();
-      const sessionUser = data?.session?.user;
-
-      if (sessionUser) {
-        const r = await fetchProfile(sessionUser.id);
-
-        setUser(sessionUser);
-        setRole(r);
-      }
-
+    const fallback = setTimeout(() => {
+      console.log("[INIT] getSession() timed out — clearing loading state");
       setLoading(false);
+    }, 3000);
+
+    const init = async () => {
+      try {
+        const { data } = await supabase.auth.getSession();
+        const sessionUser = data?.session?.user;
+
+        console.log("[INIT] getSession() resolved", { hasSession: !!sessionUser });
+
+        if (sessionUser) {
+          const r = await fetchProfile(sessionUser.id);
+          setUser(sessionUser);
+          setRole(r);
+        }
+      } catch (e) {
+        console.error("[INIT ERROR]", e);
+      } finally {
+        clearTimeout(fallback);
+        setLoading(false);
+      }
     };
 
     init();
@@ -65,8 +79,11 @@ function PortalApp() {
 
   // login
   const signIn = async () => {
+    console.log("SIGNIN START");
+
     setError("");
 
+    console.log("SIGNIN CALLING SUPABASE");
     const { data, error } = await supabase.auth.signInWithPassword({
       email: email.trim().toLowerCase(),
       password,
@@ -78,7 +95,13 @@ function PortalApp() {
     }
 
     const u = data.user;
-    const r = await fetchProfile(u.id);
+
+    let r = null;
+    try {
+      r = await fetchProfile(u.id);
+    } catch (e) {
+      console.error("[SIGNIN] fetchProfile threw", e);
+    }
 
     setUser(u);
     setRole(r);
@@ -121,13 +144,18 @@ function PortalApp() {
   // ROUTING FIX (core fix)
   const normalizedRole = (role || "").toLowerCase();
 
+  // Administrator routing restored (Phase 1): render the real
+  // AdminDashboard instead of the placeholder heading. Its internal
+  // navigate() prop only drives sub-views within its own partner
+  // pipeline (partners list / partner profile) — not yet wired to any
+  // other module, so a no-op keeps this a minimal, safe change.
+  if (normalizedRole === "admin") {
+    return <AdminDashboard navigate={() => {}} />;
+  }
+
   return (
     <div style={{ padding: 20 }}>
-      {normalizedRole === "admin" ? (
-        <h1>Admin Dashboard</h1>
-      ) : (
-        <h1>Partner Portal</h1>
-      )}
+      <h1>Partner Portal</h1>
 
       <p>Logged in as: {user.email}</p>
       <p>Role: {normalizedRole || "undefined"}</p>

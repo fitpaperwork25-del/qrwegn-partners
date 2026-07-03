@@ -182,10 +182,11 @@ export default function PartnerProfile({ partnerId, navigate }) {
           .or(`regional_partner_id.eq.${partnerId},submitted_by_partner_id.eq.${partnerId}`)
           .order("created_at", { ascending: false }),
         supabase
-          .from("partner_payouts")
+          .from("payouts")
           .select("*")
-          .eq("partner_id", partnerId)
-          .order("payout_date", { ascending: false }),
+          .eq("beneficiary_type", "partner")
+          .eq("beneficiary_id", partnerId)
+          .order("paid_on", { ascending: false }),
         supabase
           .from("commission_transactions")
           .select("*")
@@ -287,10 +288,11 @@ export default function PartnerProfile({ partnerId, navigate }) {
   const loadPayouts = async () => {
     if (!partnerId) return;
     const { data } = await supabase
-      .from("partner_payouts")
+      .from("payouts")
       .select("*")
-      .eq("partner_id", partnerId)
-      .order("payout_date", { ascending: false });
+      .eq("beneficiary_type", "partner")
+      .eq("beneficiary_id", partnerId)
+      .order("paid_on", { ascending: false });
     if (data) setPartnerPayouts(data);
   };
 
@@ -298,13 +300,17 @@ export default function PartnerProfile({ partnerId, navigate }) {
     if (!payoutForm.amount || !payoutForm.payout_date) return;
     setSavingPayout(true);
     setPayoutError("");
-    const { error } = await supabase.from("partner_payouts").insert({
-      partner_id:     partnerId,
-      amount:         Number(payoutForm.amount),
-      currency:       payoutForm.currency,
-      payout_date:    payoutForm.payout_date,
-      payment_method: payoutForm.payment_method || null,
-      notes:          payoutForm.notes.trim() || null,
+    const note = payoutForm.payment_method
+      ? `${payoutForm.payment_method}${payoutForm.notes.trim() ? " — " + payoutForm.notes.trim() : ""}`
+      : (payoutForm.notes.trim() || null);
+    const { error } = await supabase.from("payouts").insert({
+      beneficiary_type: "partner",
+      beneficiary_id:   partnerId,
+      beneficiary:      partner?.full_name || null,
+      amount:           Number(payoutForm.amount),
+      currency:         payoutForm.currency,
+      paid_on:          payoutForm.payout_date,
+      note,
     });
     setSavingPayout(false);
     if (error) { setPayoutError(error.message); return; }
@@ -315,7 +321,7 @@ export default function PartnerProfile({ partnerId, navigate }) {
 
   // ── Computed values ───────────────────────────────────────────────
 
-  // Per-currency earnings summary — owed from commission_transactions, paid from partner_payouts
+  // Per-currency earnings summary — owed from commission_transactions, paid from payouts (beneficiary_type='partner')
   const earningsByCurrency = (() => {
     const map = {};
     commissionTransactions
@@ -797,7 +803,7 @@ export default function PartnerProfile({ partnerId, navigate }) {
               <table style={{ width: "100%", borderCollapse: "collapse" }}>
                 <thead>
                   <tr style={{ borderBottom: "1px solid rgba(100,160,220,0.3)" }}>
-                    <TH>Date</TH><TH>Amount</TH><TH>Method</TH><TH>Notes</TH>
+                    <TH>Date</TH><TH>Amount</TH><TH>Notes</TH>
                   </tr>
                 </thead>
                 <tbody>
@@ -807,10 +813,9 @@ export default function PartnerProfile({ partnerId, navigate }) {
                       onMouseEnter={e => e.currentTarget.style.background = "rgba(100,160,220,0.04)"}
                       onMouseLeave={e => e.currentTarget.style.background = "transparent"}
                     >
-                      <td style={{ padding: "10px 14px", fontSize: 13, color: "#7ab0cc", whiteSpace: "nowrap" }}>{fmtDate(p.payout_date)}</td>
+                      <td style={{ padding: "10px 14px", fontSize: 13, color: "#7ab0cc", whiteSpace: "nowrap" }}>{fmtDate(p.paid_on)}</td>
                       <td style={{ padding: "10px 14px", fontSize: 14, fontWeight: 600, color: "#35c060", whiteSpace: "nowrap" }}>{p.currency || "USD"} {Number(p.amount).toFixed(2)}</td>
-                      <td style={{ padding: "10px 14px", fontSize: 13, color: "#a0c8e8" }}>{p.payment_method || "—"}</td>
-                      <td style={{ padding: "10px 14px", fontSize: 13, color: "#7ab0cc" }}>{p.notes || "—"}</td>
+                      <td style={{ padding: "10px 14px", fontSize: 13, color: "#7ab0cc" }}>{p.note || "—"}</td>
                     </tr>
                   ))}
                 </tbody>

@@ -130,6 +130,9 @@ export default function PromotorPortal({ profile, onLogout }) {
   const [leadsLoaded,  setLeadsLoaded] = useState(false);
   const [myPayouts,    setMyPayouts]   = useState([]);
   const [promotorId,   setPromotorId]  = useState(null);
+  const [commissionTxns,  setCommissionTxns]  = useState([]);
+  const [commTxnsLoading, setCommTxnsLoading] = useState(false);
+  const [commSummary,     setCommSummary]     = useState(null);
   const [demoLinks,    setDemoLinks]   = useState([]);
   const [training,      setTraining]     = useState(DEFAULT_TRAINING);
   const [materials,     setMaterials]    = useState(DEFAULT_MATERIALS);
@@ -175,6 +178,27 @@ export default function PromotorPortal({ profile, onLogout }) {
           .order("paid_on", { ascending: false })
           .then(({ data, error }) => {
             if (!error) setMyPayouts(data || []);
+          });
+
+        // 3b. Commission transactions — persisted, generator-produced records
+        setCommTxnsLoading(true);
+        supabase
+          .from("commission_transactions")
+          .select("*")
+          .eq("promotor_id", pId)
+          .order("created_at", { ascending: false })
+          .then(({ data, error }) => {
+            if (!error) setCommissionTxns(data || []);
+            setCommTxnsLoading(false);
+          });
+
+        // 3c. Aggregate summary view, if it returns a row for this promotor
+        supabase
+          .from("commission_summary_with_payouts")
+          .select("*")
+          .eq("promotor_id", pId)
+          .then(({ data, error }) => {
+            if (!error && data?.length) setCommSummary(data);
           });
       } else {
         // No promotor link yet — show empty rather than all rows
@@ -707,6 +731,93 @@ export default function PromotorPortal({ profile, onLogout }) {
                     </table>
                   </div>
                 )}
+              </Card>
+
+              {/* Commission transactions — persisted, generator-produced records */}
+              <Card>
+                <SectionLabel>
+                  COMMISSION TRANSACTIONS
+                  {commissionTxns.length > 0 && (
+                    <span style={{ marginLeft: 10, fontSize: 12, color: "#5ab0f0", fontWeight: 700 }}>{commissionTxns.length}</span>
+                  )}
+                </SectionLabel>
+                {(() => {
+                  const summaryRow = commSummary?.find(r => !!r.promotor_id) ?? commSummary?.[0] ?? null;
+                  const totalEarned = summaryRow
+                    ? Number(summaryRow.total_promotor_commission || 0)
+                    : commissionTxns.reduce((s, tx) => s + Number(tx.promotor_commission || 0), 0);
+                  const totalPaid = summaryRow
+                    ? Number(summaryRow.promotor_paid || 0)
+                    : myPayouts.reduce((s, p) => s + Number(p.amount || 0), 0);
+                  const balanceDue = summaryRow
+                    ? Number(summaryRow.promotor_balance_due ?? Math.max(0, totalEarned - totalPaid))
+                    : Math.max(0, totalEarned - totalPaid);
+
+                  return (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                      <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 10 }}>
+                        {[
+                          { label: "Total Earned", value: `USD ${totalEarned.toFixed(2)}`, color: "#a0c8e8" },
+                          { label: "Total Paid",   value: `USD ${totalPaid.toFixed(2)}`,   color: "#35c060" },
+                          { label: "Balance Due",  value: `USD ${balanceDue.toFixed(2)}`,  color: balanceDue > 0 ? "#e8c547" : "#35c060" },
+                        ].map(s => (
+                          <div key={s.label} style={{ background: "rgba(6,12,30,0.6)", borderRadius: 10, padding: "12px 14px", border: "1px solid rgba(50,80,140,0.3)" }}>
+                            <div style={{ fontSize: 10, color: "#4a7090", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 6 }}>{s.label}</div>
+                            <div style={{ fontSize: 18, fontWeight: 800, color: s.color }}>{s.value}</div>
+                          </div>
+                        ))}
+                      </div>
+
+                      {commTxnsLoading ? (
+                        <p style={{ fontSize: 14, color: "#3a5a70", margin: 0 }}>Loading…</p>
+                      ) : commissionTxns.length === 0 ? (
+                        <p style={{ fontSize: 14, color: "#3a5a70", margin: 0 }}>No commission transactions yet. Transactions appear when leads reach Signed or Active status.</p>
+                      ) : (
+                        <div style={{ overflowX: "auto" }}>
+                          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                            <thead>
+                              <tr style={{ borderBottom: "1px solid rgba(50,80,140,0.35)" }}>
+                                {["Business", "Period Start", "Period End", "Subscription", "Your Commission", "Status"].map(h => (
+                                  <th key={h} style={{ padding: "8px 12px", textAlign: "left", fontSize: 11, color: "#4a7090", fontWeight: 700, letterSpacing: "0.08em", whiteSpace: "nowrap" }}>
+                                    {h.toUpperCase()}
+                                  </th>
+                                ))}
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {commissionTxns.map((tx, i) => {
+                                const businessName = myLeads.find(l => l.id === tx.lead_id)?.business_name || "—";
+                                const sc = tx.status === "paid"
+                                  ? { color: "#35c060", bg: "rgba(40,180,80,0.12)" }
+                                  : tx.status === "owed"
+                                  ? { color: "#e8c547", bg: "rgba(232,197,71,0.12)" }
+                                  : { color: "#5ab0f0", bg: "rgba(100,160,220,0.18)" };
+                                return (
+                                  <tr key={tx.id} style={{ borderBottom: i < commissionTxns.length - 1 ? "1px solid rgba(50,80,140,0.14)" : "none" }}>
+                                    <td style={{ padding: "11px 12px", fontSize: 14, fontWeight: 600, color: "#ffffff" }}>{businessName}</td>
+                                    <td style={{ padding: "11px 12px", fontSize: 13, color: "#b0cce0", whiteSpace: "nowrap" }}>{fmtDate(tx.period_start)}</td>
+                                    <td style={{ padding: "11px 12px", fontSize: 13, color: "#b0cce0", whiteSpace: "nowrap" }}>{fmtDate(tx.period_end)}</td>
+                                    <td style={{ padding: "11px 12px", fontSize: 13, color: "#a0c8e8", whiteSpace: "nowrap" }}>
+                                      {tx.subscription_amount != null ? `USD ${Number(tx.subscription_amount).toFixed(2)}` : "—"}
+                                    </td>
+                                    <td style={{ padding: "11px 12px", fontSize: 13, fontWeight: 700, color: "#e8c547", whiteSpace: "nowrap" }}>
+                                      {tx.promotor_commission != null ? `USD ${Number(tx.promotor_commission).toFixed(2)}` : "—"}
+                                    </td>
+                                    <td style={{ padding: "11px 12px" }}>
+                                      <span style={{ fontSize: 11, fontWeight: 700, padding: "3px 10px", borderRadius: 20, background: sc.bg, color: sc.color, textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                                        {tx.status || "—"}
+                                      </span>
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
               </Card>
 
               {/* Payout history */}

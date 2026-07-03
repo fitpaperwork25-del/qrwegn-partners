@@ -14,6 +14,8 @@ import MaterialsPage from "./pages/MaterialsPage";
 import PartnersPage from "./pages/PartnersPage";
 import PartnerProfile from "./pages/PartnerProfile";
 import TrainingPage from "./pages/TrainingPage";
+import PromotorPortal from "./pages/PromotorPortal";
+import PartnerPortal from "./pages/PartnerPortal";
 
 function PortalApp() {
   const [user, setUser] = useState(null);
@@ -282,6 +284,19 @@ function PortalApp() {
         {page === "notifications" && <NotificationsPage />}
       </AdminLayout>
     );
+  }
+
+  // Promotor/partner routing restored — matches last known-good App.jsx
+  // (commit dd7b17b), lost when admin routing was restored in 3c28410
+  // from that same snapshot without carrying these branches forward.
+  if (normalizedRole === "promotor") {
+    const profile = { email: user?.email, full_name: user?.email };
+    return <PromotorPortal profile={profile} onLogout={logout} />;
+  }
+
+  if (normalizedRole === "partner") {
+    const profile = { email: user?.email, full_name: user?.email };
+    return <PartnerPortal profile={profile} onLogout={logout} />;
   }
 
   return (

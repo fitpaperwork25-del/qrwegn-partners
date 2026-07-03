@@ -178,11 +178,15 @@ function PortalApp() {
     setPage(to);
   };
 
-  const logout = () => {
+  const logout = async () => {
+    try {
+      await supabase.auth.signOut();
+    } catch (e) {
+      console.error("[LOGOUT] signOut error:", e);
+    }
     setUser(null);
     setRole(null);
     setPage("dashboard");
-    supabase.auth.signOut().catch(e => console.error("[LOGOUT] signOut error:", e));
   };
 
   if (loading) return <div style={{ padding: 20 }}>Loading...</div>;

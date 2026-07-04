@@ -17,6 +17,7 @@ import TrainingPage from "./pages/TrainingPage";
 import PromotorPortal from "./pages/PromotorPortal";
 import PartnerPortal from "./pages/PartnerPortal";
 import ViewAsBanner from "./components/ViewAsBanner";
+import LoginScreen from "./components/LoginScreen";
 
 function PortalApp() {
   const [user, setUser] = useState(null);
@@ -232,32 +233,14 @@ function PortalApp() {
   // LOGIN SCREEN
   if (!user) {
     return (
-      <div style={{ maxWidth: 400, margin: "80px auto" }}>
-        <h2>QR-Wegn Login</h2>
-
-        <input
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          placeholder="email"
-          style={{ width: "100%", padding: 10, marginBottom: 10 }}
-        />
-
-        <input
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          placeholder="password"
-          style={{ width: "100%", padding: 10, marginBottom: 10 }}
-        />
-
-        {error && (
-          <div style={{ color: "red", marginBottom: 10 }}>{error}</div>
-        )}
-
-        <button onClick={signIn} style={{ width: "100%", padding: 10 }}>
-          Sign In
-        </button>
-      </div>
+      <LoginScreen
+        email={email}
+        setEmail={setEmail}
+        password={password}
+        setPassword={setPassword}
+        error={error}
+        onSignIn={signIn}
+      />
     );
   }
 

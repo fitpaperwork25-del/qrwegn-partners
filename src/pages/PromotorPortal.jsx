@@ -119,7 +119,7 @@ function fmtDate(iso) {
   return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
-export default function PromotorPortal({ profile, onLogout }) {
+export default function PromotorPortal({ profile, onLogout, viewAsPromotorId = null, readOnly = false }) {
   const [tab,          setTabState]    = useState("home");
   const [lead,         setLead]        = useState(emptyLead);
   const [leadSaving,   setLeadSaving]  = useState(false);
@@ -142,21 +142,26 @@ export default function PromotorPortal({ profile, onLogout }) {
     ? profile.full_name.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase()
     : "P";
   const firstName = profile?.full_name?.split(" ")[0] || "Promotor";
+  const visibleTabs = readOnly ? TABS.filter((t) => t.id !== "leads") : TABS;
 
   useEffect(() => {
     const init = async () => {
-      // 1. Resolve this user's promotor_id from the profiles table
-      const { data: { user } } = await supabase.auth.getUser();
-      let pId = null;
-      if (user) {
-        const { data: profileRow } = await supabase
-          .from("profiles")
-          .select("promotor_id")
-          .eq("id", user.id)
-          .single();
-        pId = profileRow?.promotor_id ?? null;
-        setPromotorId(pId);
+      // 1. Resolve this user's promotor_id — an admin "view as" override
+      // takes precedence over the session; only fall back to the profiles
+      // lookup for a real promotor login.
+      let pId = viewAsPromotorId ?? null;
+      if (!pId) {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const { data: profileRow } = await supabase
+            .from("profiles")
+            .select("promotor_id")
+            .eq("id", user.id)
+            .single();
+          pId = profileRow?.promotor_id ?? null;
+        }
       }
+      setPromotorId(pId);
 
       // 2. Leads — filtered to this promotor only
       if (pId) {
@@ -238,6 +243,7 @@ export default function PromotorPortal({ profile, onLogout }) {
   };
 
   const submitLead = async () => {
+    if (readOnly) return;
     if (!lead.business_name.trim() || !lead.plan || !profile?.id) return;
     setLeadSaving(true);
     setLeadError("");
@@ -306,7 +312,7 @@ export default function PromotorPortal({ profile, onLogout }) {
 
         {/* Tabs */}
         <div style={{ display: "flex", gap: 2, marginBottom: 22, background: "rgba(4,10,24,0.85)", borderRadius: 10, padding: 3, width: "fit-content" }}>
-          {TABS.map(t => (
+          {visibleTabs.map(t => (
             <button key={t.id} onClick={() => switchTab(t.id)} style={{
               padding: "7px 15px", borderRadius: 8, border: "none", cursor: "pointer",
               background: tab === t.id ? "rgba(80,140,210,0.22)" : "transparent",
@@ -321,7 +327,7 @@ export default function PromotorPortal({ profile, onLogout }) {
         {/* HOME */}
         {tab === "home" && (
           <div style={{ display: "flex", flexDirection: "column", gap: 16, maxWidth: 540 }}>
-            <OnboardingChecklist supabase={supabase} userId={profile.id} role="promotor" />
+            {!readOnly && <OnboardingChecklist supabase={supabase} userId={profile.id} role="promotor" />}
             {(() => {
               const EARNING_STATUSES = ["signed", "active"];
               const owedByCurrency = {};
@@ -406,7 +412,7 @@ export default function PromotorPortal({ profile, onLogout }) {
         )}
 
         {/* SUBMIT LEAD */}
-        {tab === "leads" && (
+        {tab === "leads" && !readOnly && (
           <Card style={{ maxWidth: 540 }}>
             <SectionLabel>SUBMIT A LEAD</SectionLabel>
             <p style={{ fontSize: 13, color: "#4a7090", marginTop: -4, marginBottom: 20, lineHeight: 1.6 }}>

@@ -53,7 +53,7 @@ const LeadStatusBadge = ({ status }) => {
 };
 
 // ── Component ──────────────────────────────────────────────────────
-export default function PartnerProfile({ partnerId, navigate }) {
+export default function PartnerProfile({ partnerId, navigate, onViewAs }) {
   const [partner,          setPartner]          = useState(null);
   const [loading,          setLoading]          = useState(true);
   const [activeTab,        setTab]              = useState("overview");
@@ -617,6 +617,17 @@ export default function PartnerProfile({ partnerId, navigate }) {
                           {pr.commissionEarned > 0 ? `USD ${pr.commissionEarned.toFixed(2)}` : "—"}
                         </td>
                         <td style={{ padding: "12px 14px" }}>
+                          <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                          {onViewAs && (pr.isSubPartner || pr.status === "active") && (
+                            <button
+                              onClick={e => {
+                                e.stopPropagation();
+                                onViewAs(pr.isSubPartner ? "partner" : "promotor", pr.id, pr.full_name);
+                              }}
+                              style={{ padding: "4px 12px", borderRadius: 7, border: "1px solid rgba(232,197,71,0.4)", background: "rgba(232,197,71,0.12)", color: "#e8c547", fontSize: 12, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>
+                              View Portal
+                            </button>
+                          )}
                           {!pr.isSubPartner && isPending && (
                             <div style={{ display: "flex", gap: 6 }}>
                               <button
@@ -666,6 +677,7 @@ export default function PartnerProfile({ partnerId, navigate }) {
                               </button>
                             );
                           })()}
+                          </div>
                         </td>
                       </tr>
                     );

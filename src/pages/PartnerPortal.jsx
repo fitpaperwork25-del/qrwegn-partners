@@ -196,7 +196,7 @@ const FieldRow = ({ label, value }) => (
   </div>
 );
 
-export default function PartnerPortal({ profile, onLogout }) {
+export default function PartnerPortal({ profile, onLogout, viewAsPartnerId = null, readOnly = false }) {
   const [tab, setTab] = useState("home");
   const [selectedLead, setSelectedLead] = useState(null);
   const [checklist, setChecklist] = useState(
@@ -247,18 +247,22 @@ export default function PartnerPortal({ profile, onLogout }) {
   const loadAll = async () => {
     setLoading(true);
 
-    // Resolve this partner's partner_id from profiles before loading any scoped data
-    const { data: { user } } = await supabase.auth.getUser();
-    let pid = null;
-    if (user) {
-      const { data: profileRow } = await supabase
-        .from("profiles")
-        .select("partner_id")
-        .eq("id", user.id)
-        .single();
-      pid = profileRow?.partner_id ?? null;
-      setPartnerId(pid);
+    // Resolve this partner's partner_id — an admin "view as" override takes
+    // precedence over the session; only fall back to profiles lookup for a
+    // real partner login.
+    let pid = viewAsPartnerId;
+    if (!pid) {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: profileRow } = await supabase
+          .from("profiles")
+          .select("partner_id")
+          .eq("id", user.id)
+          .single();
+        pid = profileRow?.partner_id ?? null;
+      }
     }
+    setPartnerId(pid);
 
     await Promise.all([
       loadChecklist(),
@@ -400,6 +404,7 @@ export default function PartnerPortal({ profile, onLogout }) {
   };
 
   const handleRemovePromotor = async (promotor) => {
+    if (readOnly) return;
     if (!window.confirm(`Remove ${promotor.full_name || "this promotor"} from your promotors list?`)) {
       return;
     }
@@ -440,6 +445,7 @@ export default function PartnerPortal({ profile, onLogout }) {
   };
 
   const recruitPromotor = async () => {
+    if (readOnly) return;
     if (!recruitForm.full_name.trim()) return;
 
     setRecruitSaving(true);
@@ -557,6 +563,7 @@ export default function PartnerPortal({ profile, onLogout }) {
   };
 
   const submitLead = async () => {
+    if (readOnly) return;
     if (!lead.business_name.trim()) return;
 
     setLeadSaving(true);
@@ -728,6 +735,8 @@ export default function PartnerPortal({ profile, onLogout }) {
     : "P";
 
   const firstName = profile?.full_name?.split(" ")[0] || "Partner";
+
+  const visibleTabs = readOnly ? BASE_TABS.filter((t) => t.id !== "leads") : BASE_TABS;
 
   if (loading) {
     return (
@@ -944,7 +953,7 @@ export default function PartnerPortal({ profile, onLogout }) {
             flexWrap: "wrap",
           }}
         >
-          {BASE_TABS.map((item) => (
+          {visibleTabs.map((item) => (
             <button
               key={item.id}
               onClick={() => setTab(item.id)}
@@ -1565,29 +1574,31 @@ export default function PartnerPortal({ profile, onLogout }) {
 
         {tab === "my-promotors" && (
           <div>
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "flex-end",
-                marginBottom: 14,
-              }}
-            >
-              <button
-                onClick={() => { setShowRecruitForm(true); setRecruitError(""); setRecruitCredentials(null); setLoginSetupNotice(""); }}
+            {!readOnly && (
+              <div
                 style={{
-                  padding: "8px 18px",
-                  borderRadius: 8,
-                  border: "none",
-                  cursor: "pointer",
-                  background: "rgba(80,160,230,0.18)",
-                  color: "#5ab0f0",
-                  fontSize: 13,
-                  fontWeight: 700,
+                  display: "flex",
+                  justifyContent: "flex-end",
+                  marginBottom: 14,
                 }}
               >
-                + Recruit Promotor
-              </button>
-            </div>
+                <button
+                  onClick={() => { setShowRecruitForm(true); setRecruitError(""); setRecruitCredentials(null); setLoginSetupNotice(""); }}
+                  style={{
+                    padding: "8px 18px",
+                    borderRadius: 8,
+                    border: "none",
+                    cursor: "pointer",
+                    background: "rgba(80,160,230,0.18)",
+                    color: "#5ab0f0",
+                    fontSize: 13,
+                    fontWeight: 700,
+                  }}
+                >
+                  + Recruit Promotor
+                </button>
+              </div>
+            )}
 
             {recruitSuccess && (
               <div
@@ -1667,22 +1678,24 @@ export default function PartnerPortal({ profile, onLogout }) {
                       >
                         {promotor.full_name || "Unnamed Promotor"}
                       </div>
-                      <button
-                        onClick={() => handleRemovePromotor(promotor)}
-                        style={{
-                          padding: "2px 8px",
-                          borderRadius: 6,
-                          border: "1px solid rgba(220,60,60,0.3)",
-                          cursor: "pointer",
-                          background: "transparent",
-                          color: "#e05a5a",
-                          fontSize: 11,
-                          fontWeight: 700,
-                          flexShrink: 0,
-                        }}
-                      >
-                        Remove
-                      </button>
+                      {!readOnly && (
+                        <button
+                          onClick={() => handleRemovePromotor(promotor)}
+                          style={{
+                            padding: "2px 8px",
+                            borderRadius: 6,
+                            border: "1px solid rgba(220,60,60,0.3)",
+                            cursor: "pointer",
+                            background: "transparent",
+                            color: "#e05a5a",
+                            fontSize: 11,
+                            fontWeight: 700,
+                            flexShrink: 0,
+                          }}
+                        >
+                          Remove
+                        </button>
+                      )}
                     </div>
                     <div style={{ fontSize: 13, color: "#4a7090" }}>
                       {promotor.country || "No country listed"}
@@ -1919,7 +1932,7 @@ export default function PartnerPortal({ profile, onLogout }) {
           );
         })()}
 
-        {tab === "leads" && (
+        {tab === "leads" && !readOnly && (
           <Card style={{ maxWidth: 540 }}>
             <SectionLabel>SUBMIT A LEAD</SectionLabel>
 

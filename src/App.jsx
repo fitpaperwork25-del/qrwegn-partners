@@ -16,6 +16,7 @@ import PartnerProfile from "./pages/PartnerProfile";
 import TrainingPage from "./pages/TrainingPage";
 import PromotorPortal from "./pages/PromotorPortal";
 import PartnerPortal from "./pages/PartnerPortal";
+import ViewAsBanner from "./components/ViewAsBanner";
 
 function PortalApp() {
   const [user, setUser] = useState(null);
@@ -43,6 +44,9 @@ function PortalApp() {
   // instead of the no-op stub from the earlier routing-only restoration.
   const [page, setPage] = useState("dashboard");
   const [selectedPartnerId, setSelectedPartnerId] = useState(null);
+  // Admin "view as" — in-memory only, never persisted. Admin's own auth
+  // session is never touched; this just swaps which portal renders.
+  const [viewAs, setViewAs] = useState(null); // { type: 'partner'|'promotor', id, name } | null
 
   // fetch profile role (single source of truth)
   const fetchProfile = async (userId) => {
@@ -187,7 +191,11 @@ function PortalApp() {
     setUser(null);
     setRole(null);
     setPage("dashboard");
+    setViewAs(null);
   };
+
+  const startViewAs = (type, id, name) => setViewAs({ type, id, name });
+  const exitViewAs = () => setViewAs(null);
 
   if (loading) return <div style={{ padding: 20 }}>Loading...</div>;
 
@@ -265,6 +273,23 @@ function PortalApp() {
   if (normalizedRole === "admin") {
     const profile = { email: user?.email, full_name: user?.email };
 
+    // Read-only "view as" — admin's own session/role is untouched above.
+    // Renders the target portal directly with a viewAs*Id override and
+    // readOnly=true so it never resolves scope from this admin's session.
+    if (viewAs) {
+      const viewedProfile = { full_name: viewAs.name };
+      return (
+        <>
+          <ViewAsBanner type={viewAs.type} name={viewAs.name} onExit={exitViewAs} />
+          {viewAs.type === "partner" ? (
+            <PartnerPortal profile={viewedProfile} onLogout={exitViewAs} viewAsPartnerId={viewAs.id} readOnly />
+          ) : (
+            <PromotorPortal profile={viewedProfile} onLogout={exitViewAs} viewAsPromotorId={viewAs.id} readOnly />
+          )}
+        </>
+      );
+    }
+
     if (page === "analytics") {
       return <AnalyticsPage navigate={navigate} />;
     }
@@ -278,8 +303,8 @@ function PortalApp() {
     return (
       <AdminLayout page={page} navigate={navigate} onLogout={logout} profile={profile}>
         {page === "leads" && <LeadsPage navigate={navigate} />}
-        {page === "partners" && <PartnersPage navigate={navigate} />}
-        {page === "partner-profile" && <PartnerProfile partnerId={selectedPartnerId} navigate={navigate} />}
+        {page === "partners" && <PartnersPage navigate={navigate} onViewAs={startViewAs} />}
+        {page === "partner-profile" && <PartnerProfile partnerId={selectedPartnerId} navigate={navigate} onViewAs={startViewAs} />}
         {page === "clients" && <ClientsPage />}
         {page === "commissions" && <CommissionsPage />}
         {page === "payouts" && <PayoutsPage />}

@@ -9,7 +9,7 @@ const EMPTY_FORM = {
   market_tier: "entry", commission_rate: 20, parent_partner_id: "",
 };
 
-export default function PartnersPage({ navigate }) {
+export default function PartnersPage({ navigate, onViewAs }) {
   const [view, setView] = useState("list");
   const [filterStage, setFilterStage] = useState("All");
   const [search, setSearch] = useState("");
@@ -182,10 +182,18 @@ export default function PartnersPage({ navigate }) {
                   <td style={{ padding: "14px 18px", fontSize: 19, color: "#a0c8e8" }}>{p.source || "—"}</td>
                   <td style={{ padding: "14px 18px", fontSize: 19, color: "#a0c8e8" }}>{p.commission_rate}%</td>
                   <td style={{ padding: "14px 18px" }}>
-                    <button onClick={() => navigate("partner-profile", { partnerId: p.id })}
-                      style={{ fontSize: 18, color: "#5ab0f0", background: "none", border: "none", cursor: "pointer", fontWeight: 600 }}>
-                      View →
-                    </button>
+                    <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+                      <button onClick={() => navigate("partner-profile", { partnerId: p.id })}
+                        style={{ fontSize: 18, color: "#5ab0f0", background: "none", border: "none", cursor: "pointer", fontWeight: 600 }}>
+                        View →
+                      </button>
+                      {onViewAs && (
+                        <button onClick={() => onViewAs("partner", p.id, p.full_name)}
+                          style={{ fontSize: 15, color: "#e8c547", background: "none", border: "none", cursor: "pointer", fontWeight: 600 }}>
+                          View Portal
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}

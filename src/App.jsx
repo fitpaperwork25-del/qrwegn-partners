@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { supabase } from "./lib/supabase";
 import AdminDashboard from "./pages/AdminDashboard";
 import AdminLayout from "./components/AdminLayout";
@@ -48,6 +48,16 @@ function PortalApp() {
   // Admin "view as" — in-memory only, never persisted. Admin's own auth
   // session is never touched; this just swaps which portal renders.
   const [viewAs, setViewAs] = useState(null); // { type: 'partner'|'promotor', id, name } | null
+  // Ordering guard for the auth listener — same class of fix as the
+  // await-signOut-before-clearing-state fix in 47fe395. supabase.js's
+  // no-op `lock` override means concurrent supabase.auth.* operations are
+  // never serialized, so a stale "no session" event (e.g. a background
+  // refresh-token failure for an old session already in storage) can
+  // land after signIn() has already set a fresh, valid user. Once signIn()
+  // confirms a valid user, this ref marks that sign-in authoritative so
+  // the listener ignores any stale no-session event until an explicit
+  // logout() clears it — it is never cleared by the listener itself.
+  const freshSignInRef = useRef(false);
 
   // fetch profile role (single source of truth)
   const fetchProfile = async (userId) => {
@@ -107,6 +117,10 @@ function PortalApp() {
         const sessionUser = session?.user;
 
         if (!sessionUser) {
+          // Ignore a stale "no session" event that arrives after a fresh
+          // sign-in already succeeded (see freshSignInRef above) — only an
+          // explicit logout() may clear a confirmed session.
+          if (freshSignInRef.current) return;
           setUser(null);
           setRole(null);
           return;
@@ -140,6 +154,10 @@ function PortalApp() {
     }
 
     const u = data.user;
+
+    // Mark this sign-in authoritative before the profile lookup, so any
+    // stale "no session" event racing in behind it gets ignored.
+    freshSignInRef.current = true;
 
     let r = null;
     try {
@@ -189,6 +207,9 @@ function PortalApp() {
     } catch (e) {
       console.error("[LOGOUT] signOut error:", e);
     }
+    // Explicit, user-initiated logout is the only thing allowed to clear
+    // the fresh-sign-in guard (see freshSignInRef above).
+    freshSignInRef.current = false;
     setUser(null);
     setRole(null);
     setPage("dashboard");

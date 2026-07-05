@@ -340,7 +340,7 @@ function PortalApp() {
       <p>Role: {normalizedRole || "undefined"}</p>
 
       <button
-        onClick={() => supabase.auth.signOut()}
+        onClick={logout}
         style={{ marginTop: 20 }}
       >
         Sign Out

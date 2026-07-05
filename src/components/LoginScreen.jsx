@@ -51,7 +51,10 @@ const FEATURES = [
   { key: "together", label: "Together", Icon: PeopleIcon,      desc: "Grow with a network built for shared success." },
 ];
 
-export default function LoginScreen({ email, setEmail, password, setPassword, error, onSignIn }) {
+export default function LoginScreen({
+  email, setEmail, password, setPassword, error, onSignIn,
+  onForgotPassword, resetMessage, resetError, resetLoading,
+}) {
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
 
@@ -214,8 +217,34 @@ export default function LoginScreen({ email, setEmail, password, setPassword, er
                 />
                 Remember me
               </label>
-              <span className="cursor-default" style={{ color: "#86efac" }}>Forgot password?</span>
+              <button
+                type="button"
+                onClick={onForgotPassword}
+                disabled={resetLoading}
+                className="cursor-pointer disabled:cursor-default disabled:opacity-60"
+                style={{ color: "#86efac", background: "none", border: "none", padding: 0, font: "inherit" }}
+              >
+                {resetLoading ? "Sending…" : "Forgot password?"}
+              </button>
             </div>
+
+            {resetError && (
+              <div
+                className="text-sm rounded-lg px-3.5 py-2.5 mb-5"
+                style={{ background: "rgba(220,60,60,0.1)", border: "1px solid rgba(220,60,60,0.3)", color: "#f07070" }}
+              >
+                {resetError}
+              </div>
+            )}
+
+            {resetMessage && (
+              <div
+                className="text-sm rounded-lg px-3.5 py-2.5 mb-5"
+                style={{ background: "rgba(74,222,128,0.1)", border: "1px solid rgba(74,222,128,0.3)", color: "#86efac" }}
+              >
+                {resetMessage}
+              </div>
+            )}
 
             {error && (
               <div

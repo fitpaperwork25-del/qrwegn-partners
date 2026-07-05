@@ -26,6 +26,13 @@ function PortalApp() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  // Forgot-password (login screen only) — distinct from the recovery-link
+  // screen's own recoveryMessage/recoveryError below, which covers a
+  // different step (setting the new password after clicking the emailed
+  // link, not requesting that email in the first place).
+  const [resetMessage, setResetMessage] = useState("");
+  const [resetError, setResetError] = useState("");
+  const [resetLoading, setResetLoading] = useState(false);
   // Checked synchronously on first render — the Supabase client begins
   // processing a type=recovery URL immediately at module load (before
   // this component's useEffect can register an onAuthStateChange
@@ -170,6 +177,39 @@ function PortalApp() {
     setRole(r);
   };
 
+  // Forgot password — sends a real Supabase recovery email to whatever
+  // address is currently typed into the login form. Landing back on this
+  // same origin with the emailed link is already handled by the
+  // recoveryMode/type=recovery detection above and updatePassword() below.
+  const sendPasswordReset = async () => {
+    setResetMessage("");
+    setResetError("");
+
+    const trimmedEmail = email.trim().toLowerCase();
+    if (!trimmedEmail) {
+      setResetError("Enter your email above, then click Forgot password?");
+      return;
+    }
+
+    setResetLoading(true);
+    try {
+      const { error: resetErr } = await supabase.auth.resetPasswordForEmail(trimmedEmail, {
+        redirectTo: window.location.origin,
+      });
+
+      if (resetErr) {
+        setResetError(resetErr.message || "Could not send reset email. Try again.");
+        return;
+      }
+
+      setResetMessage("Password reset email sent. Check your inbox.");
+    } catch (e) {
+      setResetError(e?.message || "Could not send reset email. Try again.");
+    } finally {
+      setResetLoading(false);
+    }
+  };
+
   // Recovery-link password update
   const updatePassword = async () => {
     setRecoveryError("");
@@ -261,6 +301,10 @@ function PortalApp() {
         setPassword={setPassword}
         error={error}
         onSignIn={signIn}
+        onForgotPassword={sendPasswordReset}
+        resetMessage={resetMessage}
+        resetError={resetError}
+        resetLoading={resetLoading}
       />
     );
   }

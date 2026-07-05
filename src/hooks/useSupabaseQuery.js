@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
 
-const DEFAULT_TIMEOUT_MS = 2500;
+// 2500ms was too tight for a first request against a hosted Supabase
+// project after any idle gap (connection/pooler warm-up) — raised to a
+// realistic hosted round-trip ceiling, paired with the one-retry below.
+const DEFAULT_TIMEOUT_MS = 8000;
 
 // Shared data-fetching hook — the permanent fix for pages hanging on
 // "Loading..." forever. This same class of bug was fixed once, by hand,
@@ -36,19 +39,30 @@ export function useSupabaseQuery(queryFn, deps = [], timeoutMs = DEFAULT_TIMEOUT
     setLoading(true);
     setError(null);
 
+    const attemptOnce = async () => {
+      const timedOut = Symbol("timed-out");
+      const timeout = new Promise(resolve => setTimeout(() => resolve(timedOut), timeoutMs));
+      const result = await Promise.race([queryFn(), timeout]);
+      if (result === timedOut) throw new Error("Request timed out.");
+      return result;
+    };
+
     (async () => {
       try {
-        const timedOut = Symbol("timed-out");
-        const timeout = new Promise(resolve => setTimeout(() => resolve(timedOut), timeoutMs));
-        const result = await Promise.race([queryFn(), timeout]);
+        let result;
+        try {
+          result = await attemptOnce();
+        } catch (firstAttemptError) {
+          if (cancelled) return;
+          // One automatic retry — a lost race is often just a single slow
+          // round trip (e.g. a cold connection to a hosted Supabase
+          // project), not a real failure, so retry once before surfacing
+          // anything to the user.
+          result = await attemptOnce();
+        }
 
         if (cancelled) return;
-
-        if (result === timedOut) {
-          setError(new Error("Request timed out."));
-        } else {
-          setData(result);
-        }
+        setData(result);
       } catch (e) {
         if (!cancelled) {
           setError(e instanceof Error ? e : new Error(String(e)));

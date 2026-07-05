@@ -263,20 +263,6 @@ export default function LoginScreen({
               Sign In
               <ArrowRightIcon />
             </button>
-
-            <div className="flex items-center gap-3 my-5">
-              <span className="h-px flex-1" style={{ background: "rgba(255,255,255,0.08)" }} />
-              <span className="text-xs text-slate-500">OR</span>
-              <span className="h-px flex-1" style={{ background: "rgba(255,255,255,0.08)" }} />
-            </div>
-
-            <div
-              className="w-full rounded-xl py-3 flex items-center justify-center gap-2 text-sm font-semibold"
-              style={{ border: "1px solid rgba(134,239,172,0.35)", color: "#86efac" }}
-            >
-              <ShieldCheckIcon width={16} height={16} />
-              Need access? Contact an administrator
-            </div>
           </div>
 
           <div className="mt-5 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-xs text-slate-500">

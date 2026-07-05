@@ -19,6 +19,47 @@ import PartnerPortal from "./pages/PartnerPortal";
 import ViewAsBanner from "./components/ViewAsBanner";
 import LoginScreen from "./components/LoginScreen";
 
+// Admin URL sync — maps the existing admin `page` state to a real URL and
+// back. Admin-only: partner/promotor tab state is untouched by this.
+const ADMIN_STATIC_PAGES = [
+  "leads",
+  "partners",
+  "clients",
+  "commissions",
+  "payouts",
+  "training",
+  "analytics",
+  "reports",
+  "materials",
+  "notifications",
+];
+
+function pathForAdminPage(page, partnerId) {
+  if (page === "dashboard") return "/admin";
+  if (page === "partner-profile") {
+    return partnerId ? `/admin/partners/${encodeURIComponent(partnerId)}` : "/admin/partners";
+  }
+  return `/admin/${page}`;
+}
+
+function parseAdminPath(pathname) {
+  if (pathname === "/admin" || pathname === "/admin/") {
+    return { page: "dashboard", partnerId: null };
+  }
+
+  const partnerMatch = pathname.match(/^\/admin\/partners\/([^/]+)\/?$/);
+  if (partnerMatch) {
+    return { page: "partner-profile", partnerId: decodeURIComponent(partnerMatch[1]) };
+  }
+
+  const segment = pathname.replace(/^\/admin\/?/, "").replace(/\/$/, "");
+  if (ADMIN_STATIC_PAGES.includes(segment)) {
+    return { page: segment, partnerId: null };
+  }
+
+  return null;
+}
+
 function PortalApp() {
   const [user, setUser] = useState(null);
   const [role, setRole] = useState(null);
@@ -65,6 +106,9 @@ function PortalApp() {
   // the listener ignores any stale no-session event until an explicit
   // logout() clears it — it is never cleared by the listener itself.
   const freshSignInRef = useRef(false);
+  // Guards the one-time URL→state read below so a direct-loaded/refreshed
+  // /admin/... URL is only parsed once per session, not on every render.
+  const adminUrlInitRef = useRef(false);
 
   // fetch profile role (single source of truth)
   const fetchProfile = async (userId) => {
@@ -141,6 +185,48 @@ function PortalApp() {
     );
 
     return () => listener.subscription.unsubscribe();
+  }, []);
+
+  // Admin URL sync, step 1: once role first resolves to "admin" (covers both
+  // a direct page load at /admin/... and a fresh sign-in), read the current
+  // URL and adopt it into page/selectedPartnerId so a refreshed or shared
+  // admin URL opens the matching module. Recovery mode always wins at
+  // render time regardless (see recoveryMode check below), so this is
+  // skipped entirely while a recovery link is pending.
+  useEffect(() => {
+    if (role !== "admin" || recoveryMode || adminUrlInitRef.current) return;
+    adminUrlInitRef.current = true;
+
+    const parsed = parseAdminPath(window.location.pathname);
+    if (parsed) {
+      setPage(parsed.page);
+      if (parsed.partnerId) setSelectedPartnerId(parsed.partnerId);
+      const canonical = pathForAdminPage(parsed.page, parsed.partnerId);
+      if (canonical !== window.location.pathname) {
+        window.history.replaceState({ page: parsed.page, partnerId: parsed.partnerId }, "", canonical);
+      }
+    } else {
+      // Unknown/root path — reflect the default page state (dashboard) into
+      // a real admin URL instead of leaving the address bar unrelated.
+      const canonical = pathForAdminPage(page, selectedPartnerId);
+      if (canonical !== window.location.pathname) {
+        window.history.replaceState({ page, partnerId: selectedPartnerId }, "", canonical);
+      }
+    }
+  }, [role, recoveryMode]);
+
+  // Admin URL sync, step 2: back/forward support. Only ever matches
+  // /admin/... paths, so this is inert for the login screen and for
+  // partner/promotor portals, which never push those URLs.
+  useEffect(() => {
+    const onPopState = () => {
+      const parsed = parseAdminPath(window.location.pathname);
+      if (!parsed) return;
+      setPage(parsed.page);
+      setSelectedPartnerId(parsed.partnerId ?? null);
+    };
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
   }, []);
 
   // login
@@ -235,10 +321,19 @@ function PortalApp() {
     }
   };
 
-  // Real admin navigation — replaces the earlier no-op stub.
+  // Real admin navigation — replaces the earlier no-op stub. Also pushes a
+  // matching real URL; this function is only ever handed to admin-tree
+  // components (AdminLayout, LeadsPage, PartnersPage, PartnerProfile,
+  // AnalyticsPage, ReportsPage), so partner/promotor tab state is untouched.
   const navigate = (to, params) => {
-    if (params?.partnerId) setSelectedPartnerId(params.partnerId);
+    const partnerId = params?.partnerId ?? null;
+    if (partnerId) setSelectedPartnerId(partnerId);
     setPage(to);
+
+    const path = pathForAdminPage(to, partnerId ?? selectedPartnerId);
+    if (window.location.pathname !== path) {
+      window.history.pushState({ page: to, partnerId: partnerId ?? selectedPartnerId }, "", path);
+    }
   };
 
   const logout = async () => {
@@ -254,6 +349,13 @@ function PortalApp() {
     setRole(null);
     setPage("dashboard");
     setViewAs(null);
+    // Let a future admin sign-in in this same tab re-derive its page from
+    // the URL again (mirrors a fresh page load).
+    adminUrlInitRef.current = false;
+
+    if (window.location.pathname.startsWith("/admin")) {
+      window.history.replaceState({}, "", "/");
+    }
   };
 
   const startViewAs = (type, id, name) => setViewAs({ type, id, name });

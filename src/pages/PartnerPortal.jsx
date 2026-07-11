@@ -1,45 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "../lib/supabase";
-
-// Same timeout ceiling as useSupabaseQuery.js's DEFAULT_TIMEOUT_MS — a
-// realistic round-trip budget for the hosted Supabase project.
-const SUBMIT_TIMEOUT_MS = 8000;
-const TIMEOUT_MESSAGE = "Request timed out. Please check your connection and try again.";
-
-// Mirrors useSupabaseQuery.js's attempt/retry pattern for read calls
-// (auth + profile lookup) inside submitLead()/recruitPromotor(): races
-// against a timeout and retries once, since a lost race there is usually
-// just one slow round trip, not a real failure.
-async function withTimeoutRetry(fn, timeoutMs = SUBMIT_TIMEOUT_MS) {
-  const attemptOnce = async () => {
-    const timedOut = Symbol("timed-out");
-    const timeout = new Promise((resolve) => setTimeout(() => resolve(timedOut), timeoutMs));
-    const result = await Promise.race([fn(), timeout]);
-    if (result === timedOut) throw new Error(TIMEOUT_MESSAGE);
-    return result;
-  };
-
-  try {
-    return await attemptOnce();
-  } catch (firstAttemptError) {
-    return await attemptOnce();
-  }
-}
-
-// Same timeout as above but WITHOUT a retry — used for the actual
-// leads/promotors insert. A timed-out insert may already have committed
-// server-side with only the response lost on a bad mobile connection
-// (confirmed for the Filmon Zeru lead, 2026-07-11); auto-retrying a
-// mutation in that state would risk creating a duplicate row, so a
-// timeout here surfaces an error for the partner to retry manually
-// instead of resubmitting automatically.
-async function withTimeout(fn, timeoutMs = SUBMIT_TIMEOUT_MS) {
-  const timedOut = Symbol("timed-out");
-  const timeout = new Promise((resolve) => setTimeout(() => resolve(timedOut), timeoutMs));
-  const result = await Promise.race([fn(), timeout]);
-  if (result === timedOut) throw new Error(TIMEOUT_MESSAGE);
-  return result;
-}
+import { withTimeout, withTimeoutRetry } from "../lib/withTimeout";
+import { useLeadProducts } from "../hooks/useLeadProducts";
 
 const CHECKLIST_ITEMS = [
   {
@@ -144,6 +106,7 @@ const emptyLead = {
   phone: "",
   country: "",
   notes: "",
+  product: "",
 };
 
 const BASE_TABS = [
@@ -249,6 +212,17 @@ export default function PartnerPortal({ profile, onLogout, viewAsPartnerId = nul
   const [leadSaving, setLeadSaving] = useState(false);
   const [leadSuccess, setLeadSuccess] = useState(false);
   const [leadError, setLeadError] = useState("");
+  const {
+    products: leadProducts,
+    loading: leadProductsLoading,
+    unavailable: leadProductsUnavailable,
+  } = useLeadProducts();
+  // A product selection is only mandatory while a real list is actually
+  // available — if Platform Admin is unreachable and there's no cached
+  // list either, the field degrades to optional so the form stays
+  // submittable (see useLeadProducts.js's fallback and submitLead()'s
+  // insert payload below, which omits `product` entirely in that case).
+  const leadProductRequired = !leadProductsUnavailable;
   const [loading, setLoading] = useState(true);
   const [recruitForm, setRecruitForm] = useState({
     full_name: "",
@@ -614,6 +588,7 @@ export default function PartnerPortal({ profile, onLogout, viewAsPartnerId = nul
   const submitLead = async () => {
     if (readOnly) return;
     if (!lead.business_name.trim()) return;
+    if (leadProductRequired && !lead.product) return;
 
     setLeadSaving(true);
     setLeadError("");
@@ -645,6 +620,11 @@ export default function PartnerPortal({ profile, onLogout, viewAsPartnerId = nul
           phone: lead.phone.trim(),
           country: lead.country.trim(),
           notes: lead.notes.trim(),
+          // Omitted entirely (not sent as "") when no product was
+          // selected — e.g. the Platform Admin outage fallback — so the
+          // leads.product column's own existing default applies, exactly
+          // as it did before this field existed.
+          ...(lead.product ? { product: lead.product } : {}),
         })
       );
 
@@ -2082,6 +2062,45 @@ export default function PartnerPortal({ profile, onLogout, viewAsPartnerId = nul
                     marginBottom: 5,
                   }}
                 >
+                  PRODUCT INTERESTED IN{leadProductRequired ? "" : " (optional)"}
+                </label>
+                <select
+                  value={lead.product}
+                  onChange={(event) =>
+                    setLead((current) => ({
+                      ...current,
+                      product: event.target.value,
+                    }))
+                  }
+                  disabled={leadProductsLoading && leadProducts.length === 0}
+                  style={inputStyle}
+                >
+                  <option value="">
+                    {leadProductsUnavailable
+                      ? "Product list unavailable — submitting without a specific product"
+                      : leadProductsLoading && leadProducts.length === 0
+                      ? "Loading products…"
+                      : "Select a product"}
+                  </option>
+                  {leadProducts.map((product) => (
+                    <option key={product.productId} value={product.productName}>
+                      {product.displayName || product.productName}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label
+                  style={{
+                    fontSize: 11,
+                    fontWeight: 700,
+                    color: "#4a7090",
+                    letterSpacing: "0.08em",
+                    display: "block",
+                    marginBottom: 5,
+                  }}
+                >
                   NOTES
                 </label>
                 <textarea
@@ -2099,23 +2118,33 @@ export default function PartnerPortal({ profile, onLogout, viewAsPartnerId = nul
 
               <button
                 onClick={submitLead}
-                disabled={leadSaving || !lead.business_name.trim()}
+                disabled={
+                  leadSaving ||
+                  !lead.business_name.trim() ||
+                  (leadProductRequired && !lead.product)
+                }
                 style={{
                   padding: "12px 0",
                   borderRadius: 10,
                   border: "none",
                   background:
-                    leadSaving || !lead.business_name.trim()
+                    leadSaving ||
+                    !lead.business_name.trim() ||
+                    (leadProductRequired && !lead.product)
                       ? "rgba(80,140,210,0.18)"
                       : "linear-gradient(135deg, #3a9ad9, #2a7ab8)",
                   color:
-                    leadSaving || !lead.business_name.trim()
+                    leadSaving ||
+                    !lead.business_name.trim() ||
+                    (leadProductRequired && !lead.product)
                       ? "#3a5a70"
                       : "white",
                   fontSize: 14,
                   fontWeight: 700,
                   cursor:
-                    leadSaving || !lead.business_name.trim()
+                    leadSaving ||
+                    !lead.business_name.trim() ||
+                    (leadProductRequired && !lead.product)
                       ? "default"
                       : "pointer",
                 }}

@@ -1,6 +1,46 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "../lib/supabase";
 
+// Same timeout ceiling as useSupabaseQuery.js's DEFAULT_TIMEOUT_MS — a
+// realistic round-trip budget for the hosted Supabase project.
+const SUBMIT_TIMEOUT_MS = 8000;
+const TIMEOUT_MESSAGE = "Request timed out. Please check your connection and try again.";
+
+// Mirrors useSupabaseQuery.js's attempt/retry pattern for read calls
+// (auth + profile lookup) inside submitLead()/recruitPromotor(): races
+// against a timeout and retries once, since a lost race there is usually
+// just one slow round trip, not a real failure.
+async function withTimeoutRetry(fn, timeoutMs = SUBMIT_TIMEOUT_MS) {
+  const attemptOnce = async () => {
+    const timedOut = Symbol("timed-out");
+    const timeout = new Promise((resolve) => setTimeout(() => resolve(timedOut), timeoutMs));
+    const result = await Promise.race([fn(), timeout]);
+    if (result === timedOut) throw new Error(TIMEOUT_MESSAGE);
+    return result;
+  };
+
+  try {
+    return await attemptOnce();
+  } catch (firstAttemptError) {
+    return await attemptOnce();
+  }
+}
+
+// Same timeout as above but WITHOUT a retry — used for the actual
+// leads/promotors insert. A timed-out insert may already have committed
+// server-side with only the response lost on a bad mobile connection
+// (confirmed for the Filmon Zeru lead, 2026-07-11); auto-retrying a
+// mutation in that state would risk creating a duplicate row, so a
+// timeout here surfaces an error for the partner to retry manually
+// instead of resubmitting automatically.
+async function withTimeout(fn, timeoutMs = SUBMIT_TIMEOUT_MS) {
+  const timedOut = Symbol("timed-out");
+  const timeout = new Promise((resolve) => setTimeout(() => resolve(timedOut), timeoutMs));
+  const result = await Promise.race([fn(), timeout]);
+  if (result === timedOut) throw new Error(TIMEOUT_MESSAGE);
+  return result;
+}
+
 const CHECKLIST_ITEMS = [
   {
     item_key: "platform_overview",
@@ -451,115 +491,124 @@ export default function PartnerPortal({ profile, onLogout, viewAsPartnerId = nul
     setRecruitSaving(true);
     setRecruitError("");
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    try {
+      const {
+        data: { user },
+      } = await withTimeoutRetry(() => supabase.auth.getUser());
 
-    const { data: profileRow } = await supabase
-      .from("profiles")
-      .select("partner_id")
-      .eq("id", user.id)
-      .single();
+      if (!user) {
+        setRecruitError("Your session has expired. Please sign in again.");
+        return;
+      }
 
-    if (!profileRow?.partner_id) {
-      setRecruitSaving(false);
-      setRecruitError("Your account is not linked to a partner record.");
-      return;
-    }
+      const { data: profileRow } = await withTimeoutRetry(() =>
+        supabase.from("profiles").select("partner_id").eq("id", user.id).single()
+      );
 
-    const trimmedEmail = recruitForm.email.trim();
-    const trimmedName = recruitForm.full_name.trim();
+      if (!profileRow?.partner_id) {
+        setRecruitError("Your account is not linked to a partner record.");
+        return;
+      }
 
-    const { data: inserted, error } = await supabase.from("promotors").insert({
-      partner_id: profileRow.partner_id,
-      full_name: trimmedName,
-      email: trimmedEmail || null,
-      phone: recruitForm.phone.trim() || null,
-      country: recruitForm.country.trim() || null,
-      languages: recruitForm.languages.trim() || null,
-      notes: recruitForm.notes.trim() || null,
-      type: recruitForm.type || "individual",
-      status: "active",
-    }).select("id").single();
+      const trimmedEmail = recruitForm.email.trim();
+      const trimmedName = recruitForm.full_name.trim();
 
-    setRecruitSaving(false);
+      const { data: inserted, error } = await withTimeout(() =>
+        supabase.from("promotors").insert({
+          partner_id: profileRow.partner_id,
+          full_name: trimmedName,
+          email: trimmedEmail || null,
+          phone: recruitForm.phone.trim() || null,
+          country: recruitForm.country.trim() || null,
+          languages: recruitForm.languages.trim() || null,
+          notes: recruitForm.notes.trim() || null,
+          type: recruitForm.type || "individual",
+          status: "active",
+        }).select("id").single()
+      );
 
-    if (error) {
-      setRecruitError(error.message || "Failed to add promotor.");
-      return;
-    }
+      if (error) {
+        setRecruitError(error.message || "Failed to add promotor.");
+        return;
+      }
 
-    // Best-effort: create the promotor's login automatically. Never blocks success.
-    if (trimmedEmail && inserted?.id) {
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        const res = await fetch("/api/create-promotor-login", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${session?.access_token}`,
-          },
-          body: JSON.stringify({ promotorId: inserted.id, email: trimmedEmail, fullName: trimmedName }),
-        });
-        const data = await res.json().catch(() => ({}));
-        if (res.ok) {
-          if (data?.tempPassword) {
-            setRecruitCredentials({ email: trimmedEmail, tempPassword: data.tempPassword });
-            setLoginSetupNotice("");
+      // Best-effort: create the promotor's login automatically. Never blocks success.
+      if (trimmedEmail && inserted?.id) {
+        try {
+          const { data: { session } } = await supabase.auth.getSession();
+          const res = await fetch("/api/create-promotor-login", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${session?.access_token}`,
+            },
+            body: JSON.stringify({ promotorId: inserted.id, email: trimmedEmail, fullName: trimmedName }),
+          });
+          const data = await res.json().catch(() => ({}));
+          if (res.ok) {
+            if (data?.tempPassword) {
+              setRecruitCredentials({ email: trimmedEmail, tempPassword: data.tempPassword });
+              setLoginSetupNotice("");
+            } else {
+              setLoginSetupNotice("Promotor created, but no temporary password was returned. A login may already exist for this email.");
+            }
           } else {
-            setLoginSetupNotice("Promotor created, but no temporary password was returned. A login may already exist for this email.");
+            setLoginSetupNotice(data.error || "Promotor created, but login setup failed.");
+            console.warn("create-promotor-login failed:", data.error || res.status);
           }
-        } else {
-          setLoginSetupNotice(data.error || "Promotor created, but login setup failed.");
-          console.warn("create-promotor-login failed:", data.error || res.status);
+        } catch (e) {
+          setLoginSetupNotice("Promotor created, but login setup could not be completed. Please try again or contact admin.");
+          console.warn("create-promotor-login request failed:", e);
         }
-      } catch (e) {
-        setLoginSetupNotice("Promotor created, but login setup could not be completed. Please try again or contact admin.");
-        console.warn("create-promotor-login request failed:", e);
+
+        // Best-effort: queue onboarding notification log rows. Never blocks success.
+        try {
+          const partnerName = profile?.full_name || "A partner";
+          const { error: notifyErr } = await supabase.from("notification_logs").insert([
+            {
+              recipient_role: "admin",
+              recipient_email: "info@qrwegn.com",
+              notification_type: "promotor_recruited",
+              subject: "New promotor recruited",
+              body: `${partnerName} recruited a new promotor: ${trimmedName} (${trimmedEmail}).`,
+              status: "pending",
+            },
+            {
+              recipient_role: "promotor",
+              recipient_email: trimmedEmail,
+              notification_type: "promotor_onboarding",
+              subject: "Welcome to QR-Wegn Partners",
+              body: `Hi ${trimmedName}, welcome to QR-Wegn Partners! Your account has been created. Your partner will provide your login credentials.`,
+              status: "pending",
+            },
+          ]);
+          if (notifyErr) {
+            console.warn("notification_logs insert failed:", notifyErr.message || notifyErr);
+          }
+        } catch (e) {
+          console.warn("notification_logs insert request failed:", e);
+        }
       }
 
-      // Best-effort: queue onboarding notification log rows. Never blocks success.
-      try {
-        const partnerName = profile?.full_name || "A partner";
-        const { error: notifyErr } = await supabase.from("notification_logs").insert([
-          {
-            recipient_role: "admin",
-            recipient_email: "info@qrwegn.com",
-            notification_type: "promotor_recruited",
-            subject: "New promotor recruited",
-            body: `${partnerName} recruited a new promotor: ${trimmedName} (${trimmedEmail}).`,
-            status: "pending",
-          },
-          {
-            recipient_role: "promotor",
-            recipient_email: trimmedEmail,
-            notification_type: "promotor_onboarding",
-            subject: "Welcome to QR-Wegn Partners",
-            body: `Hi ${trimmedName}, welcome to QR-Wegn Partners! Your account has been created. Your partner will provide your login credentials.`,
-            status: "pending",
-          },
-        ]);
-        if (notifyErr) {
-          console.warn("notification_logs insert failed:", notifyErr.message || notifyErr);
-        }
-      } catch (e) {
-        console.warn("notification_logs insert request failed:", e);
-      }
+      setRecruitForm({
+        full_name: "",
+        email: "",
+        phone: "",
+        country: "",
+        languages: "",
+        notes: "",
+        type: "individual",
+      });
+      setShowRecruitForm(false);
+      setRecruitSuccess(true);
+      setTimeout(() => setRecruitSuccess(false), 3500);
+      loadPromotors();
+    } catch (e) {
+      console.error("recruitPromotor failed:", e);
+      setRecruitError(e?.message || "Failed to add promotor. Please try again.");
+    } finally {
+      setRecruitSaving(false);
     }
-
-    setRecruitForm({
-      full_name: "",
-      email: "",
-      phone: "",
-      country: "",
-      languages: "",
-      notes: "",
-      type: "individual",
-    });
-    setShowRecruitForm(false);
-    setRecruitSuccess(true);
-    setTimeout(() => setRecruitSuccess(false), 3500);
-    loadPromotors();
   };
 
   const submitLead = async () => {
@@ -569,42 +618,51 @@ export default function PartnerPortal({ profile, onLogout, viewAsPartnerId = nul
     setLeadSaving(true);
     setLeadError("");
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    try {
+      const {
+        data: { user },
+      } = await withTimeoutRetry(() => supabase.auth.getUser());
 
-    const { data: profileRow } = await supabase
-      .from("profiles")
-      .select("partner_id")
-      .eq("id", user.id)
-      .single();
+      if (!user) {
+        setLeadError("Your session has expired. Please sign in again.");
+        return;
+      }
 
-    if (!profileRow?.partner_id) {
+      const { data: profileRow } = await withTimeoutRetry(() =>
+        supabase.from("profiles").select("partner_id").eq("id", user.id).single()
+      );
+
+      if (!profileRow?.partner_id) {
+        setLeadError("Your account is not linked to a partner record.");
+        return;
+      }
+
+      const { error } = await withTimeout(() =>
+        supabase.from("leads").insert({
+          submitted_by_partner_id: profileRow.partner_id,
+          business_name: lead.business_name.trim(),
+          contact_name: lead.owner_name.trim(),
+          phone: lead.phone.trim(),
+          country: lead.country.trim(),
+          notes: lead.notes.trim(),
+        })
+      );
+
+      if (error) {
+        setLeadError(error.message || "Failed to submit lead.");
+        return;
+      }
+
+      setLead(emptyLead);
+      setLeadSuccess(true);
+      setTimeout(() => setLeadSuccess(false), 3500);
+      loadMyLeads();
+    } catch (e) {
+      console.error("submitLead failed:", e);
+      setLeadError(e?.message || "Failed to submit lead. Please try again.");
+    } finally {
       setLeadSaving(false);
-      setLeadError("Your account is not linked to a partner record.");
-      return;
     }
-
-    const { error } = await supabase.from("leads").insert({
-      submitted_by_partner_id: profileRow.partner_id,
-      business_name: lead.business_name.trim(),
-      contact_name: lead.owner_name.trim(),
-      phone: lead.phone.trim(),
-      country: lead.country.trim(),
-      notes: lead.notes.trim(),
-    });
-
-    setLeadSaving(false);
-
-    if (error) {
-      setLeadError(error.message || "Failed to submit lead.");
-      return;
-    }
-
-    setLead(emptyLead);
-    setLeadSuccess(true);
-    setTimeout(() => setLeadSuccess(false), 3500);
-    loadMyLeads();
   };
 
   // Auto-derive onboarding progress from already-loaded data — no manual DB check-off needed

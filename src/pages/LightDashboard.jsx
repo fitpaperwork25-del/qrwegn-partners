@@ -220,7 +220,7 @@ export default function LightDashboard({ navigate, onLogout, profile }) {
                 {today}
               </div>
               <button
-                onClick={() => navigate("leads")}
+                onClick={() => navigate("leads", { openAddLead: true })}
                 style={{ fontSize: 15, fontWeight: 700, padding: "11px 24px", borderRadius: 12, border: "none", background: NAVY, color: "#fff", cursor: "pointer", boxShadow: "0 2px 8px rgba(11,23,57,0.25)", transition: "opacity 0.15s" }}
                 onMouseEnter={(e) => e.currentTarget.style.opacity = "0.85"}
                 onMouseLeave={(e) => e.currentTarget.style.opacity = "1"}>
@@ -398,7 +398,7 @@ export default function LightDashboard({ navigate, onLogout, profile }) {
             <div style={sectionLabel}>Quick Actions</div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(6,1fr)", gap: 16 }}>
               {[
-                { label: "Add Lead",      icon: "＋",  action: () => navigate("leads"),       accent: NAVY       },
+                { label: "Add Lead",      icon: "＋",  action: () => navigate("leads", { openAddLead: true }), accent: NAVY },
                 { label: "Add Partner",   icon: "◇",   action: () => navigate("partners"),   accent: NAVY       },
                 { label: "Record Payout", icon: "⊙",   action: () => navigate("payouts"),    accent: GOLD       },
                 { label: "View Reports",  icon: "◧",   action: () => navigate("reports"),    accent: "#2563eb"  },

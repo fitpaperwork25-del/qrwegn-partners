@@ -1,7 +1,13 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabase";
 import { useSupabaseQuery } from "../hooks/useSupabaseQuery";
+import { useLeadProducts } from "../hooks/useLeadProducts";
+import { withTimeout, withTimeoutRetry } from "../lib/withTimeout";
 import { Card, StageBadge, STAGE_COLORS } from "./AdminDashboard";
+
+const EMPTY_ADMIN_LEAD = {
+  business_name: "", owner_name: "", phone: "", country: "", product: "", notes: "",
+};
 
 const LEAD_STATUS_COLORS = {
   new:       { color: "#5ab0f0", bg: "rgba(100,160,220,0.18)" },
@@ -18,11 +24,22 @@ const fmtDate = (iso) => {
   return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 };
 
-export default function LeadsPage({ navigate }) {
+export default function LeadsPage({ navigate, autoOpenAddLeadToken }) {
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("all");
 
-  const { data, loading, error } = useSupabaseQuery(async () => {
+  const [showAddLeadModal, setShowAddLeadModal] = useState(false);
+  const [adminLead, setAdminLead] = useState(EMPTY_ADMIN_LEAD);
+  const [adminLeadSaving, setAdminLeadSaving] = useState(false);
+  const [adminLeadError, setAdminLeadError] = useState("");
+  const [adminLeadSuccess, setAdminLeadSuccess] = useState(false);
+  const {
+    products: leadProducts,
+    loading: leadProductsLoading,
+    unavailable: leadProductsUnavailable,
+  } = useLeadProducts();
+
+  const { data, loading, error, refetch } = useSupabaseQuery(async () => {
     const [lRes, prRes] = await Promise.all([
       supabase
         .from("leads")
@@ -34,6 +51,77 @@ export default function LeadsPage({ navigate }) {
     if (prRes.error) throw prRes.error;
     return { leads: lRes.data || [], promotors: prRes.data || [] };
   }, []);
+
+  // Bumped by the Dashboard's "Add Lead" buttons (navigate("leads", {
+  // openAddLead: true })) — fires on every arrival with that intent, even
+  // if already on this page, since the token changes each time.
+  useEffect(() => {
+    if (!autoOpenAddLeadToken) return;
+    setAdminLead(EMPTY_ADMIN_LEAD);
+    setAdminLeadError("");
+    setShowAddLeadModal(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoOpenAddLeadToken]);
+
+  const submitAdminLead = async () => {
+    if (!adminLead.business_name.trim()) {
+      setAdminLeadError("Business name is required.");
+      return;
+    }
+    if (!adminLead.product) {
+      setAdminLeadError("Product is required.");
+      return;
+    }
+
+    setAdminLeadSaving(true);
+    setAdminLeadError("");
+
+    try {
+      const {
+        data: { session },
+      } = await withTimeoutRetry(() => supabase.auth.getSession());
+
+      if (!session?.access_token) {
+        setAdminLeadError("Your session has expired. Please sign in again.");
+        return;
+      }
+
+      const res = await withTimeout(() =>
+        fetch("/api/create-admin-lead", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({
+            business_name: adminLead.business_name.trim(),
+            contact_name: adminLead.owner_name.trim(),
+            phone: adminLead.phone.trim(),
+            country: adminLead.country.trim(),
+            product: adminLead.product,
+            notes: adminLead.notes.trim(),
+          }),
+        })
+      );
+
+      const body = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        setAdminLeadError(body.error || "Failed to create lead.");
+        return;
+      }
+
+      setShowAddLeadModal(false);
+      setAdminLead(EMPTY_ADMIN_LEAD);
+      setAdminLeadSuccess(true);
+      setTimeout(() => setAdminLeadSuccess(false), 3500);
+      refetch();
+    } catch (e) {
+      setAdminLeadError(e?.message || "Failed to create lead. Please try again.");
+    } finally {
+      setAdminLeadSaving(false);
+    }
+  };
 
   const leads = data?.leads || [];
   const promotors = data?.promotors || [];
@@ -76,7 +164,23 @@ export default function LeadsPage({ navigate }) {
             {leads.length} total · {leads.filter((l) => ["signed","active"].includes(l.status)).length} earning
           </p>
         </div>
+        <button
+          onClick={() => { setAdminLead(EMPTY_ADMIN_LEAD); setAdminLeadError(""); setShowAddLeadModal(true); }}
+          style={{
+            background: "linear-gradient(135deg, #3a9ad9, #2a7ab8)", color: "white",
+            border: "none", borderRadius: 10, padding: "10px 20px", fontSize: 15,
+            fontWeight: 600, cursor: "pointer", boxShadow: "0 4px 12px rgba(80,160,230,0.4)",
+          }}
+        >
+          + Add Lead
+        </button>
       </div>
+
+      {adminLeadSuccess && (
+        <div style={{ background: "rgba(40,180,80,0.08)", border: "1px solid rgba(40,180,80,0.22)", borderRadius: 10, padding: "12px 16px", marginBottom: 18, fontSize: 13, color: "#35c060" }}>
+          Lead added successfully.
+        </div>
+      )}
 
       {/* Status summary */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(6,1fr)", gap: 10, marginBottom: 24 }}>
@@ -166,6 +270,149 @@ export default function LeadsPage({ navigate }) {
           </div>
         )}
       </Card>
+
+      {/* Add Lead modal — same modal is opened either by the button above
+          or by the Dashboard's "Add Lead" buttons via autoOpenAddLeadToken. */}
+      {showAddLeadModal && (
+        <div
+          style={{
+            position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", backdropFilter: "blur(4px)",
+            display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000,
+          }}
+          onClick={(e) => { if (e.target === e.currentTarget && !adminLeadSaving) setShowAddLeadModal(false); }}
+        >
+          <div style={{
+            background: "#0d1a35", border: "1px solid rgba(90,160,255,0.2)", borderRadius: 16,
+            padding: "32px 36px", width: 520, maxHeight: "90vh", overflowY: "auto",
+            boxShadow: "0 24px 80px rgba(0,0,0,0.6)",
+          }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
+              <h2 style={{ fontSize: 22, fontWeight: 700, color: "#ffffff", margin: 0 }}>Add Lead</h2>
+              <button
+                onClick={() => setShowAddLeadModal(false)}
+                disabled={adminLeadSaving}
+                style={{ background: "none", border: "none", color: "#7ab0cc", fontSize: 22, cursor: adminLeadSaving ? "default" : "pointer", lineHeight: 1 }}
+              >
+                ×
+              </button>
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+              <div style={{ gridColumn: "1 / -1" }}>
+                <label style={adminLabelStyle}>BUSINESS NAME *</label>
+                <input
+                  style={adminInputStyle}
+                  value={adminLead.business_name}
+                  onChange={(e) => setAdminLead((f) => ({ ...f, business_name: e.target.value }))}
+                  placeholder="e.g. Sunrise Café"
+                />
+              </div>
+              <div>
+                <label style={adminLabelStyle}>OWNER / CONTACT NAME</label>
+                <input
+                  style={adminInputStyle}
+                  value={adminLead.owner_name}
+                  onChange={(e) => setAdminLead((f) => ({ ...f, owner_name: e.target.value }))}
+                />
+              </div>
+              <div>
+                <label style={adminLabelStyle}>PHONE NUMBER</label>
+                <input
+                  style={adminInputStyle}
+                  value={adminLead.phone}
+                  onChange={(e) => setAdminLead((f) => ({ ...f, phone: e.target.value }))}
+                />
+              </div>
+              <div style={{ gridColumn: "1 / -1" }}>
+                <label style={adminLabelStyle}>COUNTRY</label>
+                <input
+                  style={adminInputStyle}
+                  value={adminLead.country}
+                  onChange={(e) => setAdminLead((f) => ({ ...f, country: e.target.value }))}
+                />
+              </div>
+              <div style={{ gridColumn: "1 / -1" }}>
+                <label style={adminLabelStyle}>PRODUCT INTERESTED IN *</label>
+                <select
+                  style={adminInputStyle}
+                  value={adminLead.product}
+                  onChange={(e) => setAdminLead((f) => ({ ...f, product: e.target.value }))}
+                  disabled={leadProductsUnavailable || (leadProductsLoading && leadProducts.length === 0)}
+                >
+                  <option value="">
+                    {leadProductsUnavailable
+                      ? "Product list unavailable"
+                      : leadProductsLoading && leadProducts.length === 0
+                      ? "Loading products…"
+                      : "Select a product"}
+                  </option>
+                  {leadProducts.map((product) => (
+                    <option key={product.productId} value={product.productName}>
+                      {product.displayName || product.productName}
+                    </option>
+                  ))}
+                </select>
+                {leadProductsUnavailable && (
+                  <p style={{ color: "#ff9900", fontSize: 13, marginTop: 8, marginBottom: 0 }}>
+                    The product list is currently unavailable, so a lead cannot be added right now. Please try again shortly.
+                  </p>
+                )}
+              </div>
+              <div style={{ gridColumn: "1 / -1" }}>
+                <label style={adminLabelStyle}>NOTES</label>
+                <textarea
+                  style={{ ...adminInputStyle, resize: "vertical" }}
+                  rows={3}
+                  value={adminLead.notes}
+                  onChange={(e) => setAdminLead((f) => ({ ...f, notes: e.target.value }))}
+                />
+              </div>
+            </div>
+
+            {adminLeadError && (
+              <p style={{ color: "#ff6666", fontSize: 14, marginTop: 16, marginBottom: 0 }}>{adminLeadError}</p>
+            )}
+
+            <div style={{ display: "flex", gap: 12, marginTop: 24 }}>
+              <button
+                onClick={() => setShowAddLeadModal(false)}
+                disabled={adminLeadSaving}
+                style={{
+                  flex: 1, padding: "12px 0", borderRadius: 10, border: "1px solid rgba(100,160,220,0.3)",
+                  background: "transparent", color: "#a0c8e8", fontSize: 16, cursor: adminLeadSaving ? "default" : "pointer",
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={submitAdminLead}
+                disabled={adminLeadSaving || !adminLead.business_name.trim() || !adminLead.product}
+                style={{
+                  flex: 2, padding: "12px 0", borderRadius: 10, border: "none",
+                  background: adminLeadSaving || !adminLead.business_name.trim() || !adminLead.product
+                    ? "rgba(80,160,230,0.4)"
+                    : "linear-gradient(135deg, #3a9ad9, #2a7ab8)",
+                  color: "white", fontSize: 16, fontWeight: 600,
+                  cursor: adminLeadSaving || !adminLead.business_name.trim() || !adminLead.product ? "default" : "pointer",
+                }}
+              >
+                {adminLeadSaving ? "Submitting..." : "Add Lead"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
+
+const adminInputStyle = {
+  width: "100%", padding: "10px 12px", borderRadius: 8, fontSize: 15,
+  border: "1.5px solid rgba(100,160,220,0.35)", background: "rgba(8,16,36,0.95)",
+  color: "#ffffff", outline: "none", boxSizing: "border-box",
+};
+
+const adminLabelStyle = {
+  fontSize: 12, color: "#a0c8e8", fontWeight: 600,
+  letterSpacing: "0.06em", display: "block", marginBottom: 5,
+};

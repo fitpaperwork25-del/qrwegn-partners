@@ -93,6 +93,11 @@ function PortalApp() {
   // instead of the no-op stub from the earlier routing-only restoration.
   const [page, setPage] = useState("dashboard");
   const [selectedPartnerId, setSelectedPartnerId] = useState(null);
+  // Bumped by navigate("leads", { openAddLead: true }) — LeadsPage watches
+  // this value (not just its presence) so arriving with that intent always
+  // re-triggers the effect that opens the Add Lead modal, even if already
+  // on the Leads page. Never read anywhere except passed through as a prop.
+  const [leadsAutoOpenToken, setLeadsAutoOpenToken] = useState(0);
   // Admin "view as" — in-memory only, never persisted. Admin's own auth
   // session is never touched; this just swaps which portal renders.
   const [viewAs, setViewAs] = useState(null); // { type: 'partner'|'promotor', id, name } | null
@@ -328,6 +333,7 @@ function PortalApp() {
   const navigate = (to, params) => {
     const partnerId = params?.partnerId ?? null;
     if (partnerId) setSelectedPartnerId(partnerId);
+    if (params?.openAddLead) setLeadsAutoOpenToken((t) => t + 1);
     setPage(to);
 
     const path = pathForAdminPage(to, partnerId ?? selectedPartnerId);
@@ -452,7 +458,7 @@ function PortalApp() {
 
     return (
       <AdminLayout page={page} navigate={navigate} onLogout={logout} profile={profile}>
-        {page === "leads" && <LeadsPage navigate={navigate} />}
+        {page === "leads" && <LeadsPage navigate={navigate} autoOpenAddLeadToken={leadsAutoOpenToken} />}
         {page === "partners" && <PartnersPage navigate={navigate} onViewAs={startViewAs} />}
         {page === "partner-profile" && <PartnerProfile partnerId={selectedPartnerId} navigate={navigate} onViewAs={startViewAs} />}
         {page === "clients" && <ClientsPage />}

@@ -132,7 +132,7 @@ export default function LightDashboard({ navigate, onLogout, profile }) {
 
         {/* Logo */}
         <div style={{ padding: "28px 20px 22px", borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
-          <img src="/Logo.png" alt="QR-Wegn" style={{ height: 26 }} />
+          <img src="/wegn-logo.png" alt="WEGN" style={{ height: 26 }} />
           <div style={{ marginTop: 8, fontSize: 11, fontWeight: 700, letterSpacing: "0.14em", color: "rgba(255,255,255,0.35)" }}>
             PARTNER NETWORK
           </div>

@@ -820,7 +820,7 @@ export default function PartnerPortal({ profile, onLogout, viewAsPartnerId = nul
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-          <img src="/Logo.png" alt="QR-Wegn" style={{ height: 30 }} />
+          <img src="/wegn-logo.png" alt="WEGN" style={{ height: 30 }} />
           <span
             style={{
               fontSize: 11,

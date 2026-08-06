@@ -287,7 +287,7 @@ export default function PromotorPortal({ profile, onLogout, viewAsPromotorId = n
       {/* Topbar */}
       <div style={{ background: "rgba(6,12,30,0.97)", backdropFilter: "blur(20px)", borderBottom: "1px solid rgba(50,80,140,0.3)", padding: "0 24px", display: "flex", alignItems: "center", justifyContent: "space-between", position: "sticky", top: 0, zIndex: 100, height: 58 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-          <img src="/Logo.png" alt="QR-Wegn" style={{ height: 30 }} />
+          <img src="/wegn-logo.png" alt="WEGN" style={{ height: 30 }} />
           <span style={{ fontSize: 11, color: "#3a5a70", fontWeight: 700, letterSpacing: "0.12em" }}>PROMOTOR PORTAL</span>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 14 }}>

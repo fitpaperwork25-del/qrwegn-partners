@@ -24,7 +24,7 @@ function AdminLayout({ children, page, navigate, onLogout, profile }) {
         boxShadow: "2px 0 24px rgba(0,0,0,0.3)"
       }}>
         <div style={{ padding: "24px 20px 20px", borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
-          <img src="/Logo.png" alt="QR-Wegn" style={{ width: 140, display: "block" }} />
+          <img src="/wegn-logo.png" alt="WEGN" style={{ width: 140, display: "block" }} />
           <div style={{ fontSize: 11, color: "rgba(255,255,255,0.4)", marginTop: 8, letterSpacing: "0.08em", fontWeight: 500 }}>
             PARTNER NETWORK
           </div>

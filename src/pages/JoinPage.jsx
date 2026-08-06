@@ -119,7 +119,7 @@ export default function JoinPage({ partnerId }) {
         width: "100%",
       }}>
         <div style={{ textAlign: "center", marginBottom: 32 }}>
-          <img src="/Logo.png" alt="QR-Wegn" style={{ width: 150, display: "block", margin: "0 auto 24px" }} />
+          <img src="/wegn-logo.png" alt="WEGN" style={{ width: 150, display: "block", margin: "0 auto 24px" }} />
           <h1 style={{ fontSize: 26, fontWeight: 700, color: "#ffffff", margin: "0 0 10px" }}>
             Join as a Partner
           </h1>

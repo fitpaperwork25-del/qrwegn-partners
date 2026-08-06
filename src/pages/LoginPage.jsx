@@ -1,3 +1,25 @@
+/**
+ * DEPRECATED — dead code, pending removal in a separate cleanup commit.
+ *
+ * Marked 2026-08-02 during WEGN Partners Repository Certification. This
+ * component is not imported, routed, dynamically loaded, or otherwise
+ * referenced anywhere in this repository (verified by a full
+ * repository-wide reference check covering imports, routing, dynamic
+ * imports, tests, build config, and deployment config). The live login
+ * flow is `App.jsx` (see its `fetchProfile()`/`signIn()`) paired with
+ * the presentational `LoginScreen.jsx`, which already fails closed
+ * correctly on a lookup failure.
+ *
+ * This file's role-resolution logic below (`profileData?.role ||
+ * "partner"`) does NOT reflect the live application's behavior and
+ * should not be used as a reference. It is left in place, unmodified,
+ * pending a dedicated cleanup commit to delete it — do not wire it back
+ * into the application without first fixing that fallback.
+ *
+ * See wegn-master-kb/22_VALIDATION_FINDINGS_AND_INCONSISTENCY_LOG.md §2
+ * and wegn-master-kb/product-registry/PARTNERS_INTEGRATION_STATUS.md
+ * Issue 1 for the full corrected finding.
+ */
 import { useState } from "react";
 import { supabase } from "../lib/supabase";
 
@@ -125,13 +147,12 @@ export default function LoginPage({ onLogin }) {
       >
         <div style={{ textAlign: "center", marginBottom: 32 }}>
           <img
-            src="/Logo.png"
-            alt="QR-Wegn"
+            src="/wegn-logo.png"
+            alt="WEGN"
             style={{
               width: 180,
               display: "block",
               margin: "0 auto 18px",
-              background: "white",
             }}
           />
 

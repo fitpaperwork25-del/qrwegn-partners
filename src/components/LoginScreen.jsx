@@ -74,9 +74,10 @@ export default function LoginScreen({
 
           <div className="relative mb-5 sm:mb-6 inline-block">
             {/* Soft integrated glow behind the logo — not a box, just a gentle
-                lift so the mark reads as an intentional brand anchor. The PNG's
-                own near-black background already closely matches the page, and
-                mix-blend-mode: screen removes any remaining seam at its edges. */}
+                lift so the mark reads as an intentional brand anchor. The new
+                PNG has real alpha transparency, so no mix-blend-mode trick is
+                needed anymore (the old asset had an opaque near-black fill and
+                relied on mix-blend-mode: screen to fake a seamless edge). */}
             <div
               aria-hidden
               className="pointer-events-none absolute -inset-4 rounded-2xl"
@@ -87,9 +88,8 @@ export default function LoginScreen({
             />
             <img
               src="/wegn-logo.png"
-              alt="Wegn"
+              alt="WEGN"
               className="relative h-16 sm:h-20 w-auto max-w-full object-contain object-left block"
-              style={{ mixBlendMode: "screen" }}
             />
           </div>
 

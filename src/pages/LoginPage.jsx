@@ -337,7 +337,7 @@ export default function LoginPage({ onLogin }) {
             marginBottom: 0,
           }}
         >
-          QR-Wegn · ወግን · Partner Network
+          WEGN · ወግን · Partner Network
         </p>
       </div>
     </div>

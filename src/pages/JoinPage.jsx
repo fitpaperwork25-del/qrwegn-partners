@@ -94,7 +94,7 @@ export default function JoinPage({ partnerId }) {
             Application Received
           </h2>
           <p style={{ fontSize: 16, color: "#a0c8e8", lineHeight: 1.7, margin: 0 }}>
-            Thank you. Your QR-Wegn partner application has been received. We'll be in touch shortly.
+            Thank you. Your WEGN partner application has been received. We'll be in touch shortly.
           </p>
         </div>
       </div>
@@ -124,7 +124,7 @@ export default function JoinPage({ partnerId }) {
             Join as a Partner
           </h1>
           <p style={{ fontSize: 15, color: "#a0c8e8", margin: 0, lineHeight: 1.6 }}>
-            You've been referred to join the QR-Wegn partner network. Fill in your details below.
+            You've been referred to join the WEGN partner network. Fill in your details below.
           </p>
         </div>
 

@@ -49,7 +49,7 @@ function printReport(title, sections) {
     @media print { body { margin: 16px; } }
   </style></head><body>
     <h1>${title}</h1>
-    <p class="sub">Generated ${ts} · QR-Wegn Partner Network</p>
+    <p class="sub">Generated ${ts} · WEGN Partner Network</p>
     ${sections.map(tableHtml).join("")}
   </body></html>`;
   const win = window.open("", "_blank");
@@ -194,7 +194,7 @@ export default function ReportsPage({ navigate }) {
     ]);
   };
 
-  const exportAllPDF = () => printReport("QR-Wegn Partner Report", [
+  const exportAllPDF = () => printReport("WEGN Partner Report", [
     {
       heading: "Commission Summary",
       headers: ["Person", "Role", "Currency", "Owed", "Paid", "Balance"],

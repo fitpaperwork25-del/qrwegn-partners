@@ -37,18 +37,18 @@ const DEFAULT_TRAINING = [
     title: "Platform Overview",
     type: "guide",
     description:
-      "QRWegn helps restaurants and cafés accept QR orders. QRBooker helps salons and barbershops manage bookings.",
+      "WEGN Restaurants helps restaurants and cafés accept QR orders. WEGN Appointments helps salons and barbershops manage bookings.",
   },
   {
     id: "qrwegn-pitch",
-    title: "How to Pitch QRWegn",
+    title: "How to Pitch WEGN Restaurants",
     type: "sales",
     description:
       "Lead with the problem: slow ordering, staff pressure, missed orders, and poor customer flow. Then show scan → order → kitchen.",
   },
   {
     id: "qrbooker-pitch",
-    title: "How to Pitch QRBooker",
+    title: "How to Pitch WEGN Appointments",
     type: "sales",
     description:
       "Focus on appointment control, barber/chair schedules, fewer missed calls, and cleaner customer booking.",
@@ -96,7 +96,7 @@ const DEFAULT_MATERIALS = [
     title: "Facebook / Social Copy",
     type: "social",
     description:
-      "Ready-to-edit post copy for promoting QRWegn and QRBooker online.",
+      "Ready-to-edit post copy for promoting WEGN Restaurants and WEGN Appointments online.",
   },
 ];
 
@@ -551,8 +551,8 @@ export default function PartnerPortal({ profile, onLogout, viewAsPartnerId = nul
               recipient_role: "promotor",
               recipient_email: trimmedEmail,
               notification_type: "promotor_onboarding",
-              subject: "Welcome to QR-Wegn Partners",
-              body: `Hi ${trimmedName}, welcome to QR-Wegn Partners! Your account has been created. Your partner will provide your login credentials.`,
+              subject: "Welcome to WEGN Partners",
+              body: `Hi ${trimmedName}, welcome to WEGN Partners! Your account has been created. Your partner will provide your login credentials.`,
               status: "pending",
             },
           ]);
@@ -1382,7 +1382,7 @@ export default function PartnerPortal({ profile, onLogout, viewAsPartnerId = nul
                 lineHeight: 1.5,
               }}
             >
-              To update your profile, contact your QR-Wegn administrator.
+              To update your profile, contact your WEGN administrator.
             </div>
           </Card>
         )}

@@ -17,18 +17,18 @@ const DEFAULT_TRAINING = [
     title: "Platform Overview",
     type: "guide",
     description:
-      "QRWegn helps restaurants and cafés accept QR orders. QRBooker helps salons and barbershops manage bookings.",
+      "WEGN Restaurants helps restaurants and cafés accept QR orders. WEGN Appointments helps salons and barbershops manage bookings.",
   },
   {
     id: "qrwegn-pitch",
-    title: "How to Pitch QRWegn",
+    title: "How to Pitch WEGN Restaurants",
     type: "sales",
     description:
       "Lead with the problem: slow ordering, staff pressure, missed orders, and poor customer flow. Then show scan → order → kitchen.",
   },
   {
     id: "qrbooker-pitch",
-    title: "How to Pitch QRBooker",
+    title: "How to Pitch WEGN Appointments",
     type: "sales",
     description:
       "Focus on appointment control, barber/chair schedules, fewer missed calls, and cleaner customer booking.",
@@ -76,7 +76,7 @@ const DEFAULT_MATERIALS = [
     title: "Facebook / Social Copy",
     type: "social",
     description:
-      "Ready-to-edit post copy for promoting QRWegn and QRBooker online.",
+      "Ready-to-edit post copy for promoting WEGN Restaurants and WEGN Appointments online.",
   },
 ];
 
@@ -416,7 +416,7 @@ export default function PromotorPortal({ profile, onLogout, viewAsPromotorId = n
           <Card style={{ maxWidth: 540 }}>
             <SectionLabel>SUBMIT A LEAD</SectionLabel>
             <p style={{ fontSize: 13, color: "#4a7090", marginTop: -4, marginBottom: 20, lineHeight: 1.6 }}>
-              Know a restaurant or business that could benefit from QR-Wegn? Submit their details and we&apos;ll follow up.
+              Know a restaurant or business that could benefit from WEGN? Submit their details and we&apos;ll follow up.
             </p>
 
             {leadSuccess && (

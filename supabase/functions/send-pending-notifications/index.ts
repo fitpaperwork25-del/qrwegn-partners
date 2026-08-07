@@ -7,7 +7,7 @@ const corsHeaders = {
 };
 
 const RESEND_API_URL = "https://api.resend.com/emails";
-const FROM_ADDRESS   = "QR-Wegn Partners <info@qrwegn.com>";
+const FROM_ADDRESS   = "WEGN Partners <info@qrwegn.com>";
 
 Deno.serve(async (req: Request): Promise<Response> => {
   // OPTIONS must be handled before touching any env vars or Supabase
